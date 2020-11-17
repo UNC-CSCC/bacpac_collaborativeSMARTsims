@@ -3,10 +3,11 @@ title: "BACPAC Simulation - Code explainer"
 output: html_notebook
 ---
 
-```{r packages and scripts, echo = FALSE, warning = FALSE, message = FALSE}
+```{r packages and scripts, echo = FALSE, warning = FALSE, message = FALSE, results = 'hide'}
 library(tidyverse)
 library(DynTxRegime)
-source("BACPAC simulations.R")
+scripts <- str_subset(list.files(), ".Rmd", negate = TRUE)
+quietly(map(scripts, source))
 ```
 
 __Overview of simulation code___
@@ -15,16 +16,16 @@ The basic skeleton for creating the simulation is the following:
 
 Step 1: Generate participants and their covariates
 
-a. Generate participants: `makePpts()`
-b. Generate covariates: `makeCovariates()`
+a. Generate participants
+b. Generate covariates
 
 Step 2: Generate the trial
 
-a. Allocate first-line treatments: `allocateStage1Treatments()`
-b. Generate Y1 and responder status: `generateY1()`, `assignResponderStatus()`
-c. Allocate second-line treatments: `allocateStage2Treatments()`
-d. Generate Y2 `generateY2()`
-e. Generate Y `generateY()`
+a. Allocate first-line treatments
+b. Generate Y1 and responder status
+c. Allocate second-line treatments
+d. Generate Y2 
+e. Generate Y 
 
 Step 3: Wrap up Steps 1 and 2 in a wrapper to create many data sets
 
@@ -34,9 +35,9 @@ Step 5: Analyze the simulation data sets and assess power given the simulation p
 
 __Steps 1 and 2__
 
-Because the design of the trial is evolving, the simulation code is written with maximum flexibility and tractability in mind. Every simulation study starts with a plan which includes a design and a mechanism for generating participants and their outcomes. **The design and participants are operationalized through 8 functions where each function represents a key design or participant generation aspect.** The functions are `makePpts()`, `makeCovariates()`, `allocateStage1Treatments()`, `generateY1()`, `assignResponderStatus()`, `allocateStage2Treatments()`, `generateY2()`, `generateY()`. **The fundamental code design principle is to be tidy.** Specifically, the fundamental object is a dataframe that is piped through the 8 key functions and a dataframe is the yielded output. Once more of the design is nailed down, we may want to re-code this to utilize faster data objects.
+Because the design of the trial is evolving, the simulation code is written with maximum flexibility and tractability in mind. Every simulation study starts with a plan which includes a design and a mechanism for generating participants and their outcomes. **The design and participants are operationalized through 8 functions choices where each function represents a key design or participant generation aspect.** The function choices are: 1. making participants, 2. making covariates, 3. allocating stage 1 treatments, 4. generating Y1, 5. assigning responder status, 6. allocating stage 2 treatments based on responder status, 7. generating Y2, and 8. generating Y. **The fundamental code design principle is to be tidy.** Specifically, the fundamental object is a dataframe that is piped through the 8 key functions and a dataframe is the yielded output. Once more of the design is nailed down, we may want to re-code this to utilize faster data objects.
 
-The first function is `makePpts()`. It is parameterized by an integer `N` and returns a dataframe with `N` rows and a single variable `ptid` (patient identifier).
+I've made corresponding wrapper functions to show how functions you write/choose for each design choice should work. The first function is `makePpts()`. It is parameterized by an integer `N` and returns a dataframe with `N` rows and a single variable `ptid` (patient identifier).
 
 ```{r}
 set.seed(309482)
@@ -107,7 +108,8 @@ simDF
 
 __Step 3__
 
-Obviously, we don't want to go through each step for every simulation, so here is how you can wrap up the code into a single function. The only addition is a an additional column appended to each dataframe to keep track of which simulation data is being created. You will need to create metadata and args with the named elements as below
+Obviously, we don't want to go through each step for every simulation, so here is how you can wrap up the code into a single function. The only addition is a an additional column appended to each dataframe to keep track of which simulation data is being created. You will need to create metadata and args with the named elements as below. Note that the `args` list does exactly what we did above--for each step it lists a function name to use for the key step and the corresponding arguments. 
+
 ```{r}
 metadata <- list(N = 600,
                  firstLineTreatments = as.character(1:6),

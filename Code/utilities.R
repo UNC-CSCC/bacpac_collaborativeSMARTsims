@@ -1,0 +1,73 @@
+# Utility for BACPAC simulations
+# Author: Nikki Freeman
+# Last modified on 17 November 2020
+
+# Utility functions -----------------------------------------------------------
+#' Helper function to make a linear predictor expression
+#'
+#' @param intercept integer; interger in linear predictor
+#' @param coefs named vector of numerics; names should be the variable name in 
+#' the dataframe and the value should be the coefficient
+#'
+#' @return expression; can be used in the rhs of a mutate statement
+linearPredictor <- function(intercept, coefs){
+  coef_sym <- syms(names(coefs))
+  summands <- map2(coef_sym, coefs, ~ expr((!!.x * !!.y)))
+  summands <- c(intercept, summands)
+  eq <- reduce(summands, ~ expr(!!.x + !!.y))
+  
+  return(eq)
+}
+
+#' Helper function to make a linear predictor expresssion with interactions
+#'
+#' @param intercept integer; integer in linear predictor
+#' @param coefs named vector of numerics; names should be the variable
+#' name(s), e.g., X_1 or X_1*A_2, and the values should be the 
+#' corresponding coefficients
+#'
+#' @return expression; can be used in the rhs of a mutate statement
+linearPredictor2 <- function(intercept, coefs){
+  # separate the interaction terms and main effects terms
+  coefNames <- names(coefs)
+  coef_interaction <- coefs[str_detect(coefNames, "\\*")]
+  
+  if(length(coef_interaction) > 0){
+    coef_interaction_sym <- coefNames[str_detect(coefNames, "\\*")]
+    coef_main <- coefs[str_detect(coefNames, "\\*", negate = TRUE)]
+    coef_main_sym <- syms(names(coef_main))
+    
+    # Convert the interactions into expressions
+    coef_interaction_sym <- str_split(coef_interaction_sym, pattern = "\\*")
+    coef_interaction_sym <- map(coef_interaction_sym, linearPredictor2Helper)
+    
+    # Create summands
+    summand_interaction <- map2(coef_interaction_sym, 
+                                coef_interaction, ~ expr((!!.x * !!.y)))
+    summand_main <- map2(coef_main_sym, coef_main, ~ expr((!!.x * !!.y)))
+    # Create the summand
+    summands <- c(intercept, summand_interaction, summand_main)
+    
+    # Create the expression
+    eq <- reduce(summands, ~ expr(!!.x + !!.y))
+    
+    return(eq)
+  } else{
+    return(linearPredictor(intercept, coefs))
+  }
+  
+  
+  return(eq)
+}
+
+#' Helper function for linearPredictor2
+#'
+#' @param coef_interaction_sym character vector of coefficient names
+#' for the interaction terms
+#'
+#' @return coefficient expressions for the interaction terms
+linearPredictor2Helper <- function(coef_interaction_sym){
+  coef_symbols <- syms(coef_interaction_sym)
+  coef_expr <- reduce(coef_symbols, ~ expr(!!.x * !!.y))
+  return(coef_expr)
+}
