@@ -6,7 +6,7 @@ output: html_notebook
 ```{r packages and scripts, echo = FALSE, warning = FALSE, message = FALSE, results = 'hide'}
 library(tidyverse)
 library(DynTxRegime)
-scripts <- str_subset(list.files(), ".Rmd", negate = TRUE)
+scripts <- str_subset(list.files(), ".R$")
 quietly(map(scripts, source))
 ```
 
