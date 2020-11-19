@@ -33,6 +33,12 @@ Step 4: map-reduce to put all the simulation data together (reduce optional)
 
 Step 5: Analyze the simulation data sets and assess power given the simulation parameters
 
+Step 6: Calculate performance metrics 
+
+a. Generate an out-of-sample sample
+b. Calculate power
+c. Calculate in-sample metrics
+
 __Steps 1 and 2__
 
 Because the design of the trial is evolving, the simulation code is written with maximum flexibility and tractability in mind. Every simulation study starts with a plan which includes a design and a mechanism for generating participants and their outcomes. **The design and participants are operationalized through 8 functions choices where each function represents a key design or participant generation aspect.** The function choices are: 1. making participants, 2. making covariates, 3. allocating stage 1 treatments, 4. generating Y1, 5. assigning responder status, 6. allocating stage 2 treatments based on responder status, 7. generating Y2, and 8. generating Y. **The fundamental code design principle is to be tidy.** Specifically, the fundamental object is a dataframe that is piped through the 8 key functions and a dataframe is the yielded output. Once more of the design is nailed down, we may want to re-code this to utilize faster data objects.
@@ -53,15 +59,30 @@ simDF <- makePpts(N = N)
 simDF
 ```
 
+
 The second function is `makeCovariates()`. Because this is a SMART and the goal is to answer precision medicine questions, generating covariates and relationship between them will be key. `makeCovariates()` takes the fundamental dataframe, a covariate generating function `covariateFn`, and related parametners for `covariateFn` and returns the fundamental dataframe with the covariates appended. 
 
 Note that `covariateFn` is a function written to generate covariates. Check the library of written functions to see if there is a function that you can use or write your own to the library. In the snippet below, I have passed a function I wrote called `covariateFn_v1` and it takes 5 parameters (that are in the varargs position). 
 
+```{r covar_settings}
+### Covariate Generation Settings
+covariateFunction <- covariateFn_v1
+numBinaryCovariates <- 3 
+numNormalCovariates <- 1
+
+binaryCovarProps <- c(0.6, 0.5, 0.4)
+normalCovarMu <- 0
+normalCovarSd <- 1
+```
+
 ```{r}
 simDF <- simDF %>%
-  makeCovariates(covariateFn = covariateFn_v1, 
-                   numBinaryCovars = 3, props = c(0.6, 0.5, 0.4),
-                   numNormalCovars = 1, mu = 0, sd = 1)
+  makeCovariates(covariateFn = covariateFunction, 
+                 numBinaryCovars = numBinaryCovariates, 
+                 props = binaryCovarProps,
+                 numNormalCovars = numNormalCovariates, 
+                 mu = normalCovarMu, 
+                 sd = normalCovarSd)
 
 simDF
 ```
@@ -138,12 +159,11 @@ args <- list(
   generateY2_fn = "generateY2Fn_v1",
   generateY2_args = list(coefs = c("A1_1*X_1" = 1, "X_1" = 2, "A2_7*W_1" = 1),
                          sigma = 1),
-  generateY_fn = "setYtoY2",
-  generateY_args = NULL
-)
+  generateY_fn = "YforOneDominantRegime_v1",
+  generateY_args = list(delta = 0.4))
 
 
-makeSimDataWrapper(metadata, args, 1) 
+ex_sim <- makeSimDataWrapper(metadata, args, 1) 
 
 ```
 
@@ -174,4 +194,37 @@ res <- map(allSimData, doQLearning, moMain_stage2 = moMain, moCont_stage2 = moCo
             moMain_stage1 = moMain, moCont_stage1 = moCont)
 estimatedValues <- map(res, estimator)
 unlist(estimatedValues)
+```
+
+
+__Step 6__
+
+We'll generate out-of-sample data from the same population
+
+```{r oos_data}
+# Set to 1e5
+oosDF <- makePpts(N = 1e2) %>%
+   makeCovariates(covariateFn = covariateFunction, 
+                 numBinaryCovars = numBinaryCovariates, 
+                 props = binaryCovarProps,
+                 numNormalCovars = numNormalCovariates, 
+                 mu = normalCovarMu, 
+                 sd = normalCovarSd)
+```
+
+```{r expectations_and_pos}
+oosDF <- oosDF %>% 
+  calcTrueMeansAndPOs(indf = .,
+                      widen = FALSE,
+                      trt_options_stage1 = metadata$firstLineTreatments,
+                      trt_options_stage2 = metadata$secondLineTreatments,
+                      outcome_function_stage1 = args$generateY1_fn,
+                      outcome_function_stage2 = args$generateY2_fn,
+                      outcome_function_final = args$generateY_fn,
+                      outcome_args_stage1 = args$generateY1_args,
+                      outcome_args_stage2 = args$generateY2_args,
+                      outcome_args_final = args$generateY_args,
+                      assign_responder_fn = args$assignResponderStatus_fn,
+                      assign_responder_args = args$assignResponderStatus_args)
+
 ```
