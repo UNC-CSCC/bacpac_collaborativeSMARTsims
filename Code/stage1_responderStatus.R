@@ -29,9 +29,12 @@ assignResponderStatusByQuantile <- function(df, ctsOutcome1, cutoffs){
 #'
 #' @examples
 assignResponderStatusByNormalQuantileForStdNormalY1 <- function(df, cutoffs){
-  out <- df %>%
-    mutate(respStatus = if_else(Y1 <= qnorm(cutoffs[1]), "bad", "medium")) %>%
-    mutate(respStatus = if_else(Y1 >= qnorm(cutoffs[1]), "good", respStatus))
+  out <- df %>% 
+    group_by(A1) %>%
+    mutate(Y1_std = (Y1 - mean(Y1))/sd(Y1)) %>%
+    mutate(respStatus = if_else(Y1_std <= qnorm(cutoffs[1]), "bad", "medium")) %>%
+    mutate(respStatus = if_else(Y1_std >= qnorm(cutoffs[2]), "good", respStatus)) %>%
+    select(-Y1_std)
   
   return(out)
 }
