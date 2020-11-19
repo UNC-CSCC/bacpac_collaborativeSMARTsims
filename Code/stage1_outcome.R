@@ -25,7 +25,7 @@ generateNormalY1 <- function(df, intercept, coefs, sigma){
   out <- df %>%
     group_by(A1) %>%
     nest() %>%
-    mutate(data = map(data, makeDummyHelper, A1 = A1)) %>%
+    mutate(data = map(data, makeDummyHelper_A1, A1 = A1)) %>%
     unnest(data) %>%
     ungroup() %>%
     mutate(mu := !!(linearPredictor2(intercept = 0,
@@ -52,7 +52,7 @@ generateNormalY1 <- function(df, intercept, coefs, sigma){
   return(out)
 }
 
-makeDummyHelper <- function(data, A1){
+makeDummyHelper_A1 <- function(data, A1){
   dummy_name <- paste("A1", A1, sep = "_")
   
   data <- data %>% mutate(!!dummy_name := 1)
