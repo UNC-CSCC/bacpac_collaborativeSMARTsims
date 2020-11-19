@@ -34,8 +34,7 @@ generateNormalY1 <- function(df, intercept, coefs, sigma){
     rowwise() %>%
     mutate(Y1 = rnorm(n = 1, mean = mu, sd = sigma)) %>%
     ungroup() %>%
-    select(-mu) %>%
-    select(-starts_with("A1_"))
+    select(-mu)
     
   # out <- simDF %>% mutate(temp = 1, A1_copy = A1) %>%
   #   pivot_wider(names_from = A1_copy, names_prefix = "A1_", values_from = temp) %>%

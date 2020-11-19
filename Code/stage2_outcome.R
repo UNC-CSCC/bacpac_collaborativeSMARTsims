@@ -33,8 +33,7 @@ generateY2Fn_v1 <- function(df, coefs, sigma){
     rowwise() %>%
     mutate(Y2 = rnorm(n = 1, mean = mu, sd = sigma)) %>%
     ungroup() %>%
-    select(-mu) %>%
-    select(-starts_with("A2_"))
+    select(-mu) 
     
   
   # out <- df %>% mutate(temp = 1, A1_copy = A1) %>%
