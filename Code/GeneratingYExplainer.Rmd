@@ -114,3 +114,5 @@ allPathsAndStageValues %>%
 ```
 
 To generate Y, then, you just need to sample from say a $Normal(\cdot, 1)$ where the mean is given by the path value (what we calculated above in allPathsAndStageValues). The value of the regime then is given by taking the outer expectation w.r.t. $X_1, A_1, and A_2$.
+
+To do the simulation, you would want to generate Y's consistent with what is here. You would also want to include additional noise covariates in the analysis.
