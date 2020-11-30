@@ -1,0 +1,116 @@
+---
+title: "Simulation 1"
+output: html_notebook
+---
+
+```{r, echo = FALSE, include = FALSE, message = FALSE}
+library(tidyverse)
+```
+
+__Setup__
+
+Data generating model.
+
+\begin{align*}
+  Q_2(h_2, a_2) &= \mathbb{E}[Y \vert H_2 = h_2, A_2 = a_2] \\
+  Q_1(h_1, a_1) &= \mathbb{E}[max_{a_2} Q_2(h_2, a_2) \vert H_1 = h_1, A_1 = a_1]
+\end{align*}
+
+Then $\pi_t^{\text{opt}}(h_t) = \arg\max_{a_t}Q_t(h_t, a_t)$ for $t = 1, 2$. 
+
+Suppose that we have 1 binary tailoring variable $X_1 \in \{-1, 1\}$, and further assume that there are no intermediate tailorinig variables. Consider
+
+\begin{align*}
+  \mathbb{E}[Y \vert X_1, A_1, A_2] = (1, X_1, A_1, X_1 A_1) \beta_0 + A_2 (1, X_1, A_1) \beta_1. 
+\end{align*}
+
+WLOG, assume that there are 6 stage 2 treatments and 4 stage 1 treatments. We will use indicators for each tretment. Thus we have 
+
+\begin{align*}
+  \mathbb{E}[Y \vert X_1, A_1, A_2] = &\beta_{00} + \beta_{01} X_1 + \\
+  &\beta_{02} I(A_1 == 1) + \beta_{03} I(A_1 == 2) + \beta_{04} I(A_1 == 3) + \beta_{05} I(A_1 == 4) + \\     &\beta_{06} I(A_1 == 1) X_1 + \beta_{07} I(A_1 == 2) X_1 + \beta_{08} I(A_1 == 3) X_1 + \beta_{09} I(A_1 == 4) X_1 + \\
+  & I(A2 == 1)[\beta_{111} + \beta_{112} X_1 + \beta_{113} I(A1 == 1) + \beta_{114} I(A1 == 2) + \beta_{115} I(A1 == 3) + \beta_{116} I(A1 == 4) ] +\\
+  & I(A2 == 2)[\beta_{121} + \beta_{122} X_1 + \beta_{123} I(A1 == 1) + \beta_{124} I(A1 == 2) + \beta_{125} I(A1 == 3) + \beta_{126} I(A1 == 4) ] +\\
+  & I(A2 == 3)[\beta_{131} + \beta_{132} X_1 + \beta_{133} I(A1 == 1) + \beta_{134} I(A1 == 2) + \beta_{135} I(A1 == 3) + \beta_{136} I(A1 == 4) ] +\\
+  & I(A2 == 4)[\beta_{141} + \beta_{142} X_1 + \beta_{143} I(A1 == 1) + \beta_{144} I(A1 == 2) + \beta_{145} I(A1 == 3) + \beta_{146} I(A1 == 4) ] +\\
+  & I(A2 == 5)[\beta_{151} + \beta_{152} X_1 + \beta_{153} I(A1 == 1) + \beta_{154} I(A1 == 2) + \beta_{155} I(A1 == 3) + \beta_{156} I(A1 == 4) ] +\\
+  & I(A2 == 6)[\beta_{161} + \beta_{162} X_1 + \beta_{163} I(A1 == 1) + \beta_{164} I(A1 == 2) + \beta_{165} I(A1 == 3) + \beta_{166} I(A1 == 4) ] 
+\end{align*}
+
+Next we can specify $\beta_0$ and $\beta_1$
+
+```{r}
+beta0 <- c(.3, .25, 1, -1, .5, -.5, .75, -.75, 0, .2)
+beta1_1 <- c(0, -1, 0, 0, 1, -1)
+beta1_2 <- c(-1, .75, .5, -1, 0, .5)
+beta1_3 <- c(.5, 1, 0, 0, -.5, 1)
+beta1_4 <- c(.5, 0, -1, -.75, 0, .5)
+beta1_5 <- c(1, -1, 0, 0, .5, .5)
+beta1_6 <- c(0, .5, .5, -1, -1, -1)
+beta1 <- list(beta1_1, beta1_2, beta1_3, beta1_4, beta1_5, beta1_6)
+```
+
+Next we can obtain the optimal regime and the value of each regime
+```{r}
+linPredValueStage2 <- function(X1, A1, beta1){
+  out <- sum(c(1, X1, (A1 == 1), (A1 == 2), (A1 == 3), (A1 == 4)) * beta1)
+  
+  return(out)
+}
+
+
+calcValA2 <- function(X1, A1, beta1){
+  
+  out <- data.frame(A1 = seq(from = 1, to = length(beta1)),
+             valA2 = unlist(map(beta1, linPredValueStage2, X1 = X1, A1 = A1)))
+
+  return(out)
+}
+
+helperFn <- function(data, X1, A1, beta1){
+  out <- bind_cols(data, calcValA2(X1, A1, beta1)) %>%
+    select(A2, valA2)
+  
+  return(out)
+}
+
+calcValA1 <- function(X1, A1, beta0){
+  out <- sum(c(1, X1, (A1 == 1), (A1 == 2), (A1 == 3), (A1 == 4),
+               (A1 == 1)*X1, (A1 == 2)*X1, (A1 == 3)*X1, (A1 == 4)*X1)* beta0)
+  return(out)
+}
+
+allPaths <- expand_grid(X1 = c(1, -1),
+            A1 = c(1, 2, 3, 4),
+            A2 = c(1, 2, 3, 4, 5, 6))
+
+allPathsAndStageValues <- allPaths %>% 
+  group_by(X1, A1) %>%
+  nest() %>%
+  mutate(data = map(data, helperFn, X1 = X1, A1 = A1, beta1 = beta1)) %>%
+  unnest(data) %>%
+  group_by(X1, A1) %>%
+  mutate(maxA2 = max(valA2)) %>%
+  ungroup() %>%
+  rowwise() %>%
+  mutate(valA1 = calcValA1(X1, A1, beta0)) %>% ungroup()
+
+
+optimalDTR <- allPathsAndStageValues %>%
+  filter(valA2 == maxA2) %>%
+  group_by(X1) %>%
+  mutate(maxA1 = max(valA1)) %>%
+  filter(maxA1 == valA1) %>%
+  mutate(valOpt = maxA2 + maxA1) 
+
+# allPathsAndStageValues %>%
+#   mutate(value = valA2 + valA1) %>% summarise(mean(value))
+
+allPathsAndStageValues %>%
+  mutate(value = valA2 + valA1) %>% 
+  ggplot(aes(x = value)) +
+  geom_histogram(bins = 10)
+
+```
+
+To generate Y, then, you just need to sample from say a $Normal(\cdot, 1)$ where the mean is given by the path value (what we calculated above in allPathsAndStageValues). The value of the regime then is given by taking the outer expectation w.r.t. $X_1, A_1, and A_2$.
