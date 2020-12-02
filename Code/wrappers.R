@@ -44,6 +44,18 @@ makeSimDataWrapper <- function(metadata, args, set){
 doQLearning <- function(dat, moMain_stage2, moCont_stage2,
                         moMain_stage1, moCont_stage1){
   
+  fit_stage1 <- doQLearningListReturn(dat = dat,
+                        moMain_stage2 = moMain_stage2, 
+                        moCont_stage2 = moCont_stage2,
+                        moMain_stage1 = moMain_stage1, 
+                        moCont_stage1 = moCont_stage1)[[1]]
+  
+  return(fit_stage1)
+}
+
+doQLearningListReturn <- function(dat, moMain_stage2, moCont_stage2,
+                        moMain_stage1, moCont_stage1){
+  
   dat$A2 <- factor(dat$A2)
   dat <- data.frame(dat)
   
@@ -58,7 +70,8 @@ doQLearning <- function(dat, moMain_stage2, moCont_stage2,
                                     response = fit_stage2,
                                     data = dat,
                                     txName = "A1")
-  return(fit_stage1)
+  return(list(stage1 = fit_stage1,
+              stage2 = fit_stage2))
 }
 
 

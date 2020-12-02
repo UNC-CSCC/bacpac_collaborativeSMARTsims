@@ -96,7 +96,7 @@ generatePossibleTreatmentSequencesGrid <- function(first_line_trts,
                                           augment_trts = NULL,
                                           impermissible_trt_pairs_df = NULL){
   
-  second_stage_options <- c(second_line_trts, augment_trts)
+  second_stage_options <- c(first_line_trts, second_line_trts, augment_trts)
   
   treatment_pairs_df <- expand_grid(A1 = first_line_trts,
                                     A2 = second_stage_options)

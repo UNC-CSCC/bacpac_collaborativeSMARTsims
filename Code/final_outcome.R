@@ -39,13 +39,13 @@ setYtoY2 <- function(df){
 
 # Optimal regime: If X = 1, then give A1 = "2". Then if response is medium or bad, switch to A2 = "3", if response is good, stay on "2"
 # If X= 0, then give A1 = "4". Then if response is medium or bad, switch to "2"; if response good, stay on "4"
-YforOneDominantRegime_v1 <- function(df, delta){
+YforOneDominantRegime_v1 <- function(df, delta, sigma){
   out <- df %>% mutate(consistent = if_else(X_1 == 1 & respStatus == "good" & A1 == "2", 1, 0)) %>%
     mutate(consistent = if_else(X_1 == 1 & A1 == "2" & respStatus != "good" & A2 == "3", 1, consistent)) %>%
     mutate(consistent = if_else(X_1 == 0 & respStatus == "good" & A1 == "4", 1, consistent)) %>%
     mutate(consistent = if_else(X_1 == 0 & A1 == "4" & respStatus != "good" & A2 == "2", 1, consistent)) %>%
     rowwise() %>%
-    mutate(Y = if_else(consistent == 1, rnorm(n = 1, mean = delta, sd = 1), rnorm(1, 0, 1))) %>%
+    mutate(Y = if_else(consistent == 1, rnorm(n = 1, mean = delta, sd = sigma), rnorm(1, 0, sigma))) %>%
     ungroup()
   
   return(out)

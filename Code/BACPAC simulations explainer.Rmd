@@ -144,6 +144,13 @@ metadata <- list(N = 600,
                  secondLineTreatments = c("2", "3", "7", "8"),
                  augmentationTreatments = c("a1", "a2"),
                  standardOfCareTreatment = "1")
+
+possibleTreatmentSequences <- generatePossibleTreatmentSequencesGrid(
+  first_line_trts = metadata$firstLineTreatments,
+  second_line_trts = metadata$secondLineTreatments,
+  augment_trts = metadata$augmentationTreatments,
+  impermissible_trt_pairs_df = NULL)
+
 args <- list(
   makePpts_fn = "makePpts",
   makePpts_args = list(metadata[["N"]]),
@@ -167,7 +174,8 @@ args <- list(
   generateY2_args = list(coefs = c("A1_1*X_1" = 1, "X_1" = 2, "A2_7*W_1" = 1),
                          sigma = 1),
   generateY_fn = "YforOneDominantRegime_v1",
-  generateY_args = list(delta = 0.4))
+  generateY_args = list(delta = 0.4,
+                        sigma = 1))
 
 
 ex_sim <- makeSimDataWrapper(metadata, args, 1) 
@@ -183,7 +191,7 @@ Here's how you would use your wrapper function from Step 3 to make `L` simulatio
 set.seed(309482)
 
 # Create L data sets
-L <- 100
+L <- 10
 # allSimData <- reduce(map(1:L, makeSimDataWrapper, metadata = metadata, args = args), bind_rows)
 allSimData <- map(1:L, makeSimDataWrapper, metadata = metadata, args = args)
 ```
@@ -199,7 +207,12 @@ moCont <- moMain
 
 res <- map(allSimData, doQLearning, moMain_stage2 = moMain, moCont_stage2 = moCont,
             moMain_stage1 = moMain, moCont_stage1 = moCont)
+
+res_both_stages <- map(allSimData, doQLearningListReturn, moMain_stage2 = moMain, moCont_stage2 = moCont,
+            moMain_stage1 = moMain, moCont_stage1 = moCont)
+
 estimatedValues <- map(res, estimator)
+
 unlist(estimatedValues)
 ```
 
@@ -210,7 +223,7 @@ We'll generate out-of-sample data from the same population
 
 ```{r oos_data}
 # Set to 1e5
-oosDF <- makePpts(N = 1e2) %>%
+oosDF <- makePpts(N = 1e3) %>%
    makeCovariates(covariateFn = covariateFunction, 
                  numBinaryCovars = numBinaryCovariates, 
                  props = binaryCovarProps,
@@ -219,20 +232,10 @@ oosDF <- makePpts(N = 1e2) %>%
                  sd = normalCovarSd)
 ```
 
-```{r expectations_and_pos}
-oosDF <- oosDF %>% 
-  calcTrueMeansAndPOs(indf = .,
-                      trt_options_grid = possibleTreatmentSequences,
-                      outcome_functions_list = list(args$generateY1_fn, 
-                                                    args$generateY2_fn,
-                                                    args$assignResponderStatus_fn,
-                                                    args$generateY_fn),
-                      outcome_args_list = list(args$generateY1_args,
-                                               args$generateY2_args,
-                                               args$assignResponderStatus_args,
-                                               args$generateY_args))
 
-simPOs <- simDF %>% 
+And the expected and potential outcomes
+```{r expectations_and_pos}
+oosPOs <- oosDF %>% 
   calcTrueMeansAndPOs(indf = .,
                       trt_options_grid = possibleTreatmentSequences,
                       outcome_functions_list = list(args$generateY1_fn, 
@@ -242,5 +245,23 @@ simPOs <- simDF %>%
                       outcome_args_list = list(args$generateY1_args,
                                                args$generateY2_args,
                                                args$assignResponderStatus_args,
-                                               args$generateY_args))
+                                               args$generateY_args)) %>% 
+  calcOptTxAndValFromPOs(.)
+
+oosPOs %>% select(ptid, A1, A2, Mu, everything())
+```
+
+Predict Treatment Sequences
+
+```{r}
+
+oosTrtSeqEstimates <- map(res_both_stages, ~predictTreatSequence(., newdata = oosDF))
+
+
+```
+
+
+
+```{r}
+oosVals <- map_dfr(oosTrtSeqEstimates, ~getValueDifSummary(., po_grid_df = oosPOs))
 ```
