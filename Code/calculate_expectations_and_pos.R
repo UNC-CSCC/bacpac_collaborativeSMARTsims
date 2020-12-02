@@ -19,7 +19,9 @@
 ### Current assumptions:
 # - The treatment options are categorical or ordinal
 # - Generate a long data frame and rely on the analysis functions to group
-#
+# - Treatment names are A1 and A2
+# - Outcome names are Y1, Y2, and Y (overall outcome)
+# 
 ### Process
 # Simulate a large out-of-sample cohort
 # Pre-calculate the expected value and potential outcomes for every possible treatment sequence
@@ -49,12 +51,26 @@
 #' @return dataframe with expectations and potential outcomes
 
 calcTrueMeansAndPOs <- function(indf,
-                                widen = FALSE,
                                 trt_options_grid = NULL,
                                 outcome_functions_list,
                                 outcome_args_list){
-  
+  # Check some basic conditions
   stopifnot(length(outcome_functions_list) == length(outcome_args_list))
+  if(any(c("A1", "A2") %in% colnames(indf) == TRUE)) {
+    a1_mismatches <- setdiff(unique(indf$A1), unique(trt_options_grid$A1))
+    a2_mismatches <- setdiff(unique(indf$A2), unique(trt_options_grid$A2))
+    
+    if(is_empty(a1_matches)  == FALSE | is_empty(a1_matches) == FALSE){
+      a1_mismatches_string <- paste(sort(a1_mismatches), collapse = ", ")
+      a2_mismatches_string <- paste(sort(a2_mismatches), collapse = ", ")
+      
+      mismatch_error_msg <- paste0("Mismatch in treatments between indf and and trt_options_grid. \n", 
+                               "Differences in A1: ", a1_mismatches_string, "\n",
+                               "Differences in A2: ", a2_mismatches_string)
+      
+      stop(mismatch_error_msg)
+    }
+  }
   
   indf_with_pos <- .calcMuCreatePOShellLong(patient_df = indf,
                                                 possible_treatments_df = trt_options_grid) %>% 
@@ -186,13 +202,9 @@ calcTrueMeansAndPOs <- function(indf,
   patient_trts_and_outcomes_only <- patient_df %>% 
     .calcMuRenameVarsAndRemoveVars(indf = ., new_varname_prefix = "PO",
                                    special_var_names = special_var_names)
-    
-  obs_treatments <- semi_join(po_df, patient_df, by = c("ptid", "A1", "A2"))
-  
-  unobs_treatments <- anti_join(po_df, patient_df, by = c("ptid", "A1", "A2"))
-  
-  updated_po_df <- bind_rows(obs_treatments, unobs_treatments)
-  
+  updated_po_df <- po_df %>% 
+    rows_update(., y = patient_trts_and_outcomes_only, by = c("ptid", "A1", "A2"))
+
   return(updated_po_df)
 }
 

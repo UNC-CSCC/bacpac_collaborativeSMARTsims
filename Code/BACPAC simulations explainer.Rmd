@@ -3,7 +3,7 @@ title: "BACPAC Simulation - Code explainer"
 output: html_notebook
 ---
 
-```{r packages and scripts, echo = FALSE, warning = FALSE, message = FALSE, results = 'hide'}
+```{r packages and scripts, echo=FALSE, message=FALSE, warning=FALSE, results=}
 library(tidyverse)
 library(DynTxRegime)
 scripts <- str_subset(list.files(), ".R$")
@@ -222,7 +222,6 @@ oosDF <- makePpts(N = 1e2) %>%
 ```{r expectations_and_pos}
 oosDF <- oosDF %>% 
   calcTrueMeansAndPOs(indf = .,
-                      widen = FALSE,
                       trt_options_grid = possibleTreatmentSequences,
                       outcome_functions_list = list(args$generateY1_fn, 
                                                     args$generateY2_fn,
@@ -233,5 +232,15 @@ oosDF <- oosDF %>%
                                                args$assignResponderStatus_args,
                                                args$generateY_args))
 
-
+simPOs <- simDF %>% 
+  calcTrueMeansAndPOs(indf = .,
+                      trt_options_grid = possibleTreatmentSequences,
+                      outcome_functions_list = list(args$generateY1_fn, 
+                                                    args$generateY2_fn,
+                                                    args$assignResponderStatus_fn,
+                                                    args$generateY_fn),
+                      outcome_args_list = list(args$generateY1_args,
+                                               args$generateY2_args,
+                                               args$assignResponderStatus_args,
+                                               args$generateY_args))
 ```
