@@ -251,9 +251,17 @@ oosPOs <- oosDF %>%
 oosPOs %>% select(ptid, A1, A2, Mu, everything())
 ```
 
+Predict Treatment Sequences
+
 ```{r}
 
 oosTrtSeqEstimates <- map(res_both_stages, ~predictTreatSequence(., newdata = oosDF))
 
 
+```
+
+
+
+```{r}
+oosVals <- map_dfr(oosTrtSeqEstimates, ~getValueDifSummary(., po_grid_df = oosPOs))
 ```
