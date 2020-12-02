@@ -71,3 +71,53 @@ linearPredictor2Helper <- function(coef_interaction_sym){
   coef_expr <- reduce(coef_symbols, ~ expr(!!.x * !!.y))
   return(coef_expr)
 }
+
+
+#' Generate all possible treatment sequences given vectors of firstline treatment options,
+#' second-line treatment options, augmentation treatments (optionally), and a dataframe
+#' of impermissible treatment options (optionally). These are all treatment 
+#' sequences which could be realized, not the set of feasible treatments for a specific
+#' individual. The feasible set of second-line treatments will depend on the observed
+#' outcome after stage one. 
+#'  
+#'  @param first_line_trts character vector of first-line treatments
+#'  @param second_line_trts character vector of first-line treatments
+#'  @param augment_trts character vector of augmentation treatments
+#'  @param impermissible_trt_pairs_df a two column dataframe where the rows are 
+#'  impermissible treatment sequences. The first column specifies the first stage 
+#'  treatment and the second column specifies the second stage treatment (which
+#'  could either be a second-line treatment or an augmentation).
+#'  
+#'  @return A two column dataframe where the rows are permissible treatment sequences. 
+#'  The first column contains the stage one treatmnet, and the second column contains
+#'  the second stage treatment (either second-line treatment or augmentation)
+generatePossibleTreatmentSequencesGrid <- function(first_line_trts,
+                                          second_line_trts,
+                                          augment_trts = NULL,
+                                          impermissible_trt_pairs_df = NULL){
+  
+  second_stage_options <- c(second_line_trts, augment_trts)
+  
+  treatment_pairs_df <- expand_grid(A1 = first_line_trts,
+                                    A2 = second_stage_options)
+  
+  if (is_null(impermissible_trt_pairs_df) == FALSE){
+    stopifnot(is.data.frame(impermissible_trt_pairs_df))
+    stopifnot(ncol(impermissible_trt_pairs_df) == 2)
+    
+    if (all(colnames(impermissible_trt_pairs_df) == colnames(treatment_pairs_df)) == FALSE) {
+      warning("Column names of impermissible_trt_pairs_df are not A1 and A2,
+              the first column will be assumed to be the first stage treatment,
+              and the second column the second stage treatment (including augmentations)")
+      
+      colnames(impermissible_trt_pairs_df) <- colnames(treatment_pairs_df)
+    }
+    
+    #Anti-join returns all rows from x without a match in y
+    treatment_pairs_df <- anti_join(x = treatment_pairs_df,
+                                    y = impermissible_trt_pairs_df,
+                                    by = c("Stage1", "Stage2"))
+  }
+  
+  return(treatment_pairs_df)
+}

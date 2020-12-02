@@ -52,6 +52,13 @@ N <- 100
 firstLineTreatments <- as.character(1:6)
 secondLineTreatments <- c("2", "3", "7", "8")
 augmentationTreatments <- c("a1", "a2")
+
+possibleTreatmentSequences <- generatePossibleTreatmentSequencesGrid(
+  first_line_trts = firstLineTreatments,
+  second_line_trts = secondLineTreatments,
+  augment_trts = augmentationTreatments,
+  impermissible_trt_pairs_df = NULL)
+
 standardOfCareTreatment <- "1"
 
 simDF <- makePpts(N = N)
@@ -216,15 +223,15 @@ oosDF <- makePpts(N = 1e2) %>%
 oosDF <- oosDF %>% 
   calcTrueMeansAndPOs(indf = .,
                       widen = FALSE,
-                      trt_options_stage1 = metadata$firstLineTreatments,
-                      trt_options_stage2 = metadata$secondLineTreatments,
-                      outcome_function_stage1 = args$generateY1_fn,
-                      outcome_function_stage2 = args$generateY2_fn,
-                      outcome_function_final = args$generateY_fn,
-                      outcome_args_stage1 = args$generateY1_args,
-                      outcome_args_stage2 = args$generateY2_args,
-                      outcome_args_final = args$generateY_args,
-                      assign_responder_fn = args$assignResponderStatus_fn,
-                      assign_responder_args = args$assignResponderStatus_args)
+                      trt_options_grid = possibleTreatmentSequences,
+                      outcome_functions_list = list(args$generateY1_fn, 
+                                                    args$generateY2_fn,
+                                                    args$assignResponderStatus_fn,
+                                                    args$generateY_fn),
+                      outcome_args_list = list(args$generateY1_args,
+                                               args$generateY2_args,
+                                               args$assignResponderStatus_args,
+                                               args$generateY_args))
+
 
 ```
