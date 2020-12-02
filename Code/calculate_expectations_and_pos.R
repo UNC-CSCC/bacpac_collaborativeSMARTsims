@@ -1,6 +1,6 @@
 # Functions for Potential Outcomes 
 # Author: John Sperger
-# Last modified on 18 November 2020
+# Last modified on 01 December 2020
 
 
 ################################################################################
