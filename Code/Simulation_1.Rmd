@@ -8,6 +8,7 @@ output:
 ```{r, echo = FALSE, include = FALSE, message = FALSE}
 library(tidyverse)
 library(DynTxRegime)
+
 scripts <- str_subset(list.files(), ".R$")
 quietly(map(scripts, source))
 
@@ -25,17 +26,18 @@ Data generating model.
 
 Then $\pi_t^{\text{opt}}(h_t) = \arg\max_{a_t}Q_t(h_t, a_t)$ for $t = 1, 2$. 
 
-Suppose that we have 1 binary tailoring variable $X_1 \in \{-1, 1\}$, and further assume that there are no intermediate tailorinig variables. Consider
+Suppose that we have 1 binary tailoring variable $X_1 \in \{-1, 1\}$, and further assume that there are no intermediate tailorinig variables. There is a single 
+continuous prognostic covariate $W_1$. Consider
 
 \begin{align*}
-  \mathbb{E}[Y \vert X_1, A_1, A_2] = (1, X_1, A_1, X_1 A_1) \beta_0 + A_2 (1, X_1, A_1) \beta_1. 
+  \mathbb{E}[Y \vert X_1, A_1, A_2] = (1, X_1, W_1,  A_1, X_1 A_1) \beta_0 + A_2 (1, X_1, A_1) \beta_1. 
 \end{align*}
 
 WLOG, assume that there are 6 stage 2 treatments and 4 stage 1 treatments. We will use indicators for each treatment. Thus we have 
 
 \begin{align*}
   \mathbb{E}[Y \vert X_1, A_1, A_2] = &\beta_{00} + \beta_{01} X_1 + \beta_{02} W_1 +  \\ 
-  &\beta_{02} I(A_1 == 1) + \beta_{03} I(A_1 == 2) + \beta_{04} I(A_1 == 3) + \beta_{05} I(A_1 == 4) + \\     &\beta_{06} I(A_1 == 1) X_1 + \beta_{07} I(A_1 == 2) X_1 + \beta_{08} I(A_1 == 3) X_1 + \beta_{09} I(A_1 == 4) X_1 + \\
+  &\beta_{03} I(A_1 == 1) + \beta_{04} I(A_1 == 2) + \beta_{05} I(A_1 == 3) + \beta_{06} I(A_1 == 4) + \\     &\beta_{07} I(A_1 == 1) X_1 + \beta_{08} I(A_1 == 2) X_1 + \beta_{09} I(A_1 == 3) X_1 + \beta_{10} I(A_1 == 4) X_1 + \\
   & I(A2 == 1)[\beta_{111} + \beta_{112} X_1 + \beta_{113} I(A1 == 1) + \beta_{114} I(A1 == 2) + \beta_{115} I(A1 == 3) + \beta_{116} I(A1 == 4) ] +\\
   & I(A2 == 2)[\beta_{121} + \beta_{122} X_1 + \beta_{123} I(A1 == 1) + \beta_{124} I(A1 == 2) + \beta_{125} I(A1 == 3) + \beta_{126} I(A1 == 4) ] +\\
   & I(A2 == 3)[\beta_{131} + \beta_{132} X_1 + \beta_{133} I(A1 == 1) + \beta_{134} I(A1 == 2) + \beta_{135} I(A1 == 3) + \beta_{136} I(A1 == 4) ] +\\
@@ -147,7 +149,7 @@ possibleTreatmentSequences <- generatePossibleTreatmentSequencesGrid(
 
 
 
-```{r, cache = TRUE}
+```{r}
 set.seed(8430)
 # NC Pick 4 Daytime Draw 
 # https://nclottery.com/Pick4
@@ -155,13 +157,20 @@ set.seed(8430)
 metadata_list <- map(c(600, 800, 1000), ~list_modify(metadata, N = .))
 args_list <- map(c(600, 800, 1000), ~list_modify(args, makePpts_args = list(.)))
 
-
+run_sim_flag <- FALSE
+save_sim_data_flag <- FALSE
 
 # Create L data sets
-L <- 500
-sim_data_list <- map2(.x = metadata_list, 
-                      .y = args_list,
-                      ~map(1:L, makeSimDataWrapper, metadata = .x, args = .y))
+L <- 1000
+
+# knitr's cache option fails if the file size is too large
+if (run_sim_flag == TRUE){
+  sim_data_list <-   map2(.x = metadata_list, 
+                          .y = args_list,
+                          ~map(1:L, makeSimDataWrapper, metadata = .x, args = .y))
+} else{ sim_data_list <- readRDS("sim_data_list.RDS")}
+
+if (save_sim_data_flag == TRUE) saveRDS(sim_data_list, "sim_data_list.RDS")
 ```
 
 
@@ -214,13 +223,11 @@ simAnalysisWrapper <- function(sim_data_list_single_setting){
 
 }
 
-
-
 ```
 
 ```{r analysis_results, echo = FALSE, include = FALSE}
-run_analysis_flag <- TRUE
-save_analysis_flag <- TRUE
+run_analysis_flag <- FALSE
+save_analysis_flag <- FALSE
 
 # Got a weird cache error so here's a janky workaround
 
@@ -268,5 +275,3 @@ ggplot(data = perc_oracle_power, aes(x = Cutoff, y = Power, color = N)) +
 
 Use the predicted treatment sequence and our lookup table of values to 
 get the value of the fitted DTR and percentage of oracle value. 
-
-
