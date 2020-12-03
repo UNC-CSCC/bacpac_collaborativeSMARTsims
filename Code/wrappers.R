@@ -64,12 +64,14 @@ doQLearningListReturn <- function(dat, moMain_stage2, moCont_stage2,
                                     moCont = moCont_stage2,
                                     response = dat$Y,
                                     data = dat,
-                                    txName = "A2")
+                                    txName = "A2",
+                                    verbose = FALSE)
   fit_stage1 <- DynTxRegime::qLearn(moMain = moMain_stage1,
                                     moCont = moCont_stage1,
                                     response = fit_stage2,
                                     data = dat,
-                                    txName = "A1")
+                                    txName = "A1",
+                                    verbose = FALSE)
   return(list(stage1 = fit_stage1,
               stage2 = fit_stage2))
 }

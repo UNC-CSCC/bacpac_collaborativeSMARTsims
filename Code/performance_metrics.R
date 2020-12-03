@@ -28,7 +28,7 @@ calcOptTxAndValFromPOs <- function(mu_df){
 #' Assumes there is a final, overall outcome Y to determine the optimal treatment 
 #' sequence. 
 
-summarizeOptTxAndValFromPOs <- function(mu_df){
+summarizeOptTxAndValFromPOs <- function(mu_df, tailoring_var_names = NULL){
   opt_summary <- mu_df %>% 
     group_by(ptid) %>% 
     summarise(maxMu = max(Mu),
@@ -36,8 +36,16 @@ summarizeOptTxAndValFromPOs <- function(mu_df){
               OptA2 = A2[which.max(Mu)],
               OutcomeUnderOpt = PO[which.max(Mu)])
   
+  if(is_null(tailoring_var_names) == FALSE){
+    opt_summary <- mu_df %>% select(ptid, all_of(tailoring_var_names)) %>% 
+      distinct_at(., .vars = "ptid", .keep_all = TRUE) %>% 
+      right_join(., y = opt_summary, by = "ptid")
+  }
+  
   return(opt_summary)
 }
+
+
 
 #' Predict the optimal treatment sequence for new observations from a list of fitted
 #' models. 
@@ -74,6 +82,7 @@ getValueDifSummary <- function(predicted_seq_df,
   predicted_seq_summary <- getValueDif(predicted_seq_df,
                                        po_grid_df) %>% 
     summarise(MeanVal = mean(Mu),
+              OracleVal = mean(maxMu),
               PercOracle = mean(Mu)/mean(maxMu))
   
   return(predicted_seq_summary)

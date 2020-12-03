@@ -7,7 +7,7 @@
 #' @param df dataframe
 #'
 #' @return dataframe with Y appended where Y = Y1 + Y2
-addY1AndY2 <- function(df){
+addY1AndY2 <- function(df, ...){
   out <- df %>% mutate(Y = Y1 + Y2)
   
   return(out)
@@ -18,7 +18,7 @@ addY1AndY2 <- function(df){
 #' @param df dataframe
 #'
 #' @return dataframe with a new variable Y where Y = Y2
-setYtoY2 <- function(df){
+setYtoY2 <- function(df, ...){
   out <- df %>% mutate(Y = Y2)
   
   return(out)
@@ -50,3 +50,4 @@ YforOneDominantRegime_v1 <- function(df, delta, sigma){
   
   return(out)
 }
+
