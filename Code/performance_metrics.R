@@ -19,7 +19,8 @@ calcOptTxAndValFromPOs <- function(mu_df){
            OptA2 = A2[which.max(Mu)],
            OutcomeUnderOpt = PO[which.max(Mu)],
            DeltaMu = Mu - maxMu,
-           DeltaPO = PO - OutcomeUnderOpt) %>% 
+           DeltaPO = PO - OutcomeUnderOpt,
+           .groups = 'drop') %>% 
     ungroup
   
   return(mu_df)
@@ -34,7 +35,8 @@ summarizeOptTxAndValFromPOs <- function(mu_df, tailoring_var_names = NULL){
     summarise(maxMu = max(Mu),
               OptA1 = A1[which.max(Mu)],
               OptA2 = A2[which.max(Mu)],
-              OutcomeUnderOpt = PO[which.max(Mu)])
+              OutcomeUnderOpt = PO[which.max(Mu)],
+              .groups = 'drop')
   
   if(is_null(tailoring_var_names) == FALSE){
     opt_summary <- mu_df %>% select(ptid, all_of(tailoring_var_names)) %>% 
@@ -83,7 +85,8 @@ getValueDifSummary <- function(predicted_seq_df,
                                        po_grid_df) %>% 
     summarise(MeanVal = mean(Mu),
               OracleVal = mean(maxMu),
-              PercOracle = mean(Mu)/mean(maxMu))
+              PercOracle = mean(Mu)/mean(maxMu),
+              .groups = 'drop')
   
   return(predicted_seq_summary)
 }
