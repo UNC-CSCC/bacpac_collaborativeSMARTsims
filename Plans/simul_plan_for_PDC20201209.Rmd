@@ -1,0 +1,390 @@
+---
+title: "Simulation plan for PDC meeting on 9 December 2020"
+output: html_notebook
+---
+
+```{r, message = FALSE, echo = FALSE}
+library(tidyverse)
+```
+
+For each design, please simulate over the following parameters
+
+  * N = seq(from = 600, to = 1200, by = 100)
+  * P(responder status cut-offs) - use normal quantiles (SEE E-MAIL FROM SARA JONES)
+  * Additonal covariates for Q-learning: {None}, {N(0, 1)}, {N(0,1), Bern(0.5)}
+  * Draw Y_1 (variable for determining responder status) from a N(0, 1)
+  
+All of the regimes with tailoring variablwes depend on a single binary baseline variable coded as {-1, 1}
+
+### Design 1
+
+**Firstline treatments**: Standard of care (SOC), Treatment 1, Treatment 2
+
+**Secondline treatments**: Treatment 1, Treatment 2, Treatment 3 (step-up), SOC (if firstline SOC)
+
+\begin{align*}
+  Y = &\beta_{000} + X_1 \beta_{001} + X_2 \beta_{002} \\
+  & + I(A_1 = SOC)(\beta_{010} + X_1 \beta_{011}) \\
+  & + I(A_1 = Trt\_1)(\beta_{020} + X_1 \beta_{021}) \\
+  & + I(A_1 = Trt\_2)(\beta_{030} + X_1 \beta_{031}) \\
+  & + I(A_2 = SOC)(\beta_{110} + X_1 \beta_{111} + I(A_1 = SOC) \beta_{112} + X_2 \beta_{113}) \\
+  & + I(A_2 = Trt\_1)(\beta_{120} + X_1 \beta_{121} + I(A_1 = SOC) \beta_{122} + I(A_1 = Trt\_1) \beta_{123} + I(A_1 = Trt\_2) \beta_{124} + X_2 \beta_{125}) \\
+  & + I(A_2 = Trt\_2)(\beta_{130} + X_1 \beta_{131} + I(A_1 = SOC) \beta_{132} + I(A_1 = Trt\_1) \beta_{133} + I(A_1 = Trt\_2) \beta_{134} + X_2 \beta_{135}) \\
+  & + I(A_2 = Trt\_3)(\beta_{140} + X_1 \beta_{141} + I(A_1 = Trt\_1) \beta_{142} + I(A_1 = Trt\_2) \beta_{143} + X_2 \beta_{144}) \\
+\end{align*}
+
+#### Scenario 1
+
+One optimal DTR has value 0.3. 
+
+```{r, echo = TRUE, results = 'hide'}
+# Coefficients to plug into Y (above)
+beta0 <- list(beta00 = c(0, 0, 0), # prognostic
+              beta01 = c(0, 0), # SOC
+              beta02 = c(0.15/2, 0.15/2), # Treatment 1
+              beta03 = c(0.15/2, -0.15/2)) # Treatment 2
+beta1 <- list(beta11 = c(0, 0, 0, 0), # SOC
+              beta12 = c(0, 0, 0, 0.15, 0, 0), # Treatment 1
+              beta13 = c(0, 0, 0, 0, 0.15, 0), # Treatment 2
+              beta14 = c(0, 0, 0.15, 0.15, 0)) # Treatment 3
+
+design <- expand.grid(X1 = c(1, -1),
+            A1 = c("SOC", "1", "2"),
+            A2 = c("SOC", "1", "2", "3")) %>%
+  filter(!(A1 != "SOC" & A2 == "SOC")) %>%
+  filter(!(A1 == "SOC" & A2 == "3")) 
+
+# Values
+values <- design %>% mutate(val2 = (A2 == "3")*((0.15)*(A1 == "1") + (0.15)*(A1 == "2")) 
+         + (A2 == "2")*(0.15*(A1 == "2")) 
+         + (A2 == "1")*(0.15*(A1 == "1"))) %>%
+  mutate(val1 = (A1 == 1)*(0.15/2 + (0.15/2)*X1) + (A1 == 2)*(0.15/2 + (-0.15/2)*X1)) %>%
+  mutate(val = val1 + val2)
+
+# Optimal DTR and value
+opt <- values %>%
+  group_by(X1, A1) %>%
+  filter(val2 == max(val2)) %>%
+  group_by(X1) %>%
+  filter(val == max(val))
+```
+
+#### Scenario 2
+
+One treatment (Treatment 1) always dominates, regardless of covariates
+
+```{r, echo = TRUE, results = 'hide'}
+# Coefficients to plug into Y (above)
+beta0 <- list(beta00 = c(0, 0, 0), # prognostic
+              beta01 = c(0, 0), # SOC
+              beta02 = c(0.15, 0), # Treatment 1
+              beta03 = c(0, 0)) # Treatment 2
+beta1 <- list(beta11 = c(0, 0, 0, 0), # SOC
+              beta12 = c(0, 0, 0.3, 0.15, 0.3, 0), # Treatment 1
+              beta13 = c(0, 0, 0, 0, 0, 0), # Treatment 2
+              beta14 = c(0, 0, 0, 0, 0)) # Treatment 3
+# Values
+values <- design %>%
+  mutate(val2 = (A2 == "1")*(0.3*(A1 == "SOC") + 0.15*(A1 == "1") + 0.3*(A1 == "2"))) %>%
+  mutate(val1 = (A1 == "1")*0.15) %>%
+  mutate(val = val1 + val2)
+
+# optimal DTR and values
+opt <- values %>% group_by(X1, A1) %>%
+  filter(val2 == max(val2)) %>%
+  mutate(val = val2 + val1) %>%
+  group_by(X1) %>%
+  filter(val == max(val))
+
+```
+
+#### Design 2
+
+**Firstline treatments**: Standard of care, Treatment 1, Treatment 2, Treatment 3
+
+**Secondline treatments**: Treatment 1, Treatment 2, Treatment 3, SOC (if firstline SOC)
+
+\begin{align*}
+  Y = &\beta_{000} + X_1 \beta_{001} + X_2 \beta_{002} \\
+  & + I(A_1 = SOC)(\beta_{010} + X_1 \beta_{011}) \\
+  & + I(A_1 = Trt\_1)(\beta_{020} + X_1 \beta_{021}) \\
+  & + I(A_1 = Trt\_2)(\beta_{030} + X_1 \beta_{031}) \\
+  & + I(A_1 = Trt\_3)(\beta_{040} + X_1 \beta_{041}) \\
+  & + I(A_2 = SOC)(\beta_{110} + X_1 \beta_{111} + I(A_1 = SOC) \beta_{112} + X_2 \beta_{113}) \\
+  & + I(A_2 = Trt\_1)(\beta_{120} + X_1 \beta_{121} + I(A_1 = SOC) \beta_{122} + I(A_1 = Trt\_1) \beta_{123} + I(A_1 = Trt\_2) \beta_{124} + I(A_1 == Trt\_3) \beta_{125} + X_2 \beta_{126}) \\
+  & + I(A_2 = Trt\_2)(\beta_{130} + X_1 \beta_{131} + I(A_1 = SOC) \beta_{132} + I(A_1 = Trt\_1) \beta_{133} + I(A_1 = Trt\_2) \beta_{134} + I(A_1 == Trt\_3) \beta_{135} + X_2 \beta_{136}) \\
+  & + I(A_2 = Trt\_3)(\beta_{140} + X_1 \beta_{141} + I(A_1 = SOC) \beta_{142} + I(A_1 = Trt\_1) \beta_{143} + I(A_1 = Trt\_2) \beta_{144} + I(A_1 == Trt\_3) \beta_{145} + X_2 \beta_{146}) \\
+\end{align*}
+
+
+#### Scenario 1
+
+One optimal DTR has value 0.3. 
+
+```{r, echo = TRUE, results = 'hide'}
+# Coefficients to plug into Y (above)
+beta0 <- c(beta00 = c(0, 0, 0),
+           beta01 = c(0, 0),
+           beta02 = c(0.15/2, 0.15/2),
+           beta03 = c(0.15/2, -0.15/2),
+           beta04 = c(0, 0))
+beta1 <- c(beta11 = c(0, 0, 0, 0), # SOC
+           beta12 = c(0, 0, 0, 0.15, 0, 0, 0), # Treatment 1
+           beta13 = c(0, 0, 0, 0, 0.15, 0, 0), # Treatment 2
+           beta14 = c(0, 0, 0, 0.15/2, 0.15/2, 0, 0)) # Treatment 3
+
+# Design
+design <- expand.grid(X1 = c(1, -1),
+            A1 = c("SOC", "1", "2", "3"),
+            A2 = c("SOC", "1", "2", "3")) %>%
+  filter(!(A1 != "SOC" & A2 == "SOC")) 
+
+# Values
+values <- design %>% mutate(val2 = (A2 == "1")*((0.15)*(A1 == "1")) 
+                  + (A2 == "2")*((0.15)*(A1 == "2"))
+                  + (A2 == "3")*((0.15)*(A1 == "1") + (0.15)*(A1 == "2"))) %>%
+  mutate(val1 = (A1 == "1")*(0.15/2 + (0.15/2)*X1) 
+         + (A1 == "2")*(0.15/2 + (-0.15/2)*X1)) 
+# optimal dtr and value
+opt <- values %>%
+  mutate(val = val1 + val2) %>%
+  group_by(X1, A1) %>%
+  filter(val2 == max(val2)) %>%
+  group_by(X1) %>%
+  filter(val == max(val))
+```
+
+#### Scenario 2
+
+One treatment (Treatment 1) always dominates, regardless of covariates
+
+```{r, echo = TRUE, results = 'hide'}
+# Coefficients to plug into Y (above)
+beta0 <- c(beta00 = c(0, 0, 0),
+           beta01 = c(0, 0),
+           beta02 = c(0.15, 0),
+           beta03 = c(0, 0),
+           beta04 = c(0, 0))
+beta1 <- c(beta11 = c(0, 0, 0, 0), # SOC
+           beta12 = c(0, 0, 0.3, 0.15, 0.3, 0.3, 0), # Treatment 1
+           beta13 = c(0, 0, 0, 0, 0, 0, 0), # Treatment 2
+           beta14 = c(0, 0, 0, 0, 0.15, 0, 0)) # Treatment 3
+
+# Design
+design <- expand.grid(X1 = c(1, -1),
+            A1 = c("SOC", "1", "2", "3"),
+            A2 = c("SOC", "1", "2", "3")) %>%
+  filter(!(A1 != "SOC" & A2 == "SOC")) 
+
+# Values
+values <- design %>% mutate(val2 = (A2 == "1")*(0.3*(A1 == "SOC") + 0.15*(A1 == "1") + 0.3*(A1 == "2") + 0.3*(A1 == "3"))) %>%
+  mutate(val1 = 0.15*(A1 == "1")) %>%
+  mutate(val = val1 + val2)
+# optimal dtr and value
+opt <- values %>%
+  mutate(val = val1 + val2) %>%
+  group_by(X1, A1) %>%
+  filter(val2 == max(val2)) %>%
+  group_by(X1) %>%
+  filter(val == max(val))
+```
+
+#### Design 3
+
+**Firstline treatments**: Standard of care, Treatment 1, Treatment 2, Treatment 3
+
+**Secondline treatments**: Treatment 1, Treatment 2, Treatment 3, treatment 4 (step up), SOC (if firstline SOC)
+
+\begin{align*}
+  Y = &\beta_{000} + X_1 \beta_{001} + X_2 \beta_{002} \\
+  & + I(A_1 = SOC)(\beta_{010} + X_1 \beta_{011}) \\
+  & + I(A_1 = Trt\_1)(\beta_{020} + X_1 \beta_{021}) \\
+  & + I(A_1 = Trt\_2)(\beta_{030} + X_1 \beta_{031}) \\
+  & + I(A_1 = Trt\_3)(\beta_{040} + X_1 \beta_{041}) \\
+  & + I(A_2 = SOC)(\beta_{110} + X_1 \beta_{111} + I(A_1 = SOC) \beta_{112} + X_2 \beta_{113}) \\
+  & + I(A_2 = Trt\_1)(\beta_{120} + X_1 \beta_{121} + I(A_1 = SOC) \beta_{122} + I(A_1 = Trt\_1) \beta_{123} + I(A_1 = Trt\_2) \beta_{124} + I(A_1 == Trt\_3) \beta_{125} + X_2 \beta_{126}) \\
+  & + I(A_2 = Trt\_2)(\beta_{130} + X_1 \beta_{131} + I(A_1 = SOC) \beta_{132} + I(A_1 = Trt\_1) \beta_{133} + I(A_1 = Trt\_2) \beta_{134} + I(A_1 == Trt\_3) \beta_{135} + X_2 \beta_{136}) \\
+  & + I(A_2 = Trt\_3)(\beta_{140} + X_1 \beta_{141} + I(A_1 = SOC) \beta_{142} + I(A_1 = Trt\_1) \beta_{143} + I(A_1 = Trt\_2) \beta_{144} + I(A_1 == Trt\_3) \beta_{145} + X_2 \beta_{146}) \\
+  & + I(A_2 = Trt\_4)(\beta_{150} + X_1 \beta_{151} + I(A_1 = Trt\_1) \beta_{152} + I(A_1 = Trt\_2) \beta_{153} + I(A_1 = Trt\_3) \beta_{154} + X_2 \beta_{155})
+\end{align*}
+
+
+#### Scenario 1
+
+One optimal DTR has value 0.3. Values are bounded between [0, 0.3].
+
+```{r, echo = TRUE, results = 'hide'}
+# Coefficients to plug into Y (above)
+beta0 <- list(beta00 = c(0, 0, 0), # Prognostic
+              beta01 = c(0, 0), # SOC
+              beta02 = c(0.15/2, 0.15/2), # Treatment 1
+              beta03 = c(0.15/2, -0.15/2), # Treatment 2
+              beta04 = c(0, 0)) # Treatment 3
+beta1 <- list(beta11 = c(0, 0, 0, 0), # SOC
+              beta12 = c(0, 0, 0, 0.15, 0, 0, 0), # Treatment 1
+              beta13 = c(0, 0, 0, 0, 0.15, 0, 0), # Treatment 2
+              beta14 = c(0, 0, 0, 0.15, 0.15, 0, 0), # Treatment 3
+              beta15 = c(0, 0, 0, 0, 0, 0)) # Treatment 4
+
+# design
+design <- expand.grid(X1 = c(1, -1),
+            A1 = c("SOC", "1", "2", "3"),
+            A2 = c("SOC", "1", "2", "3", "4")) %>%
+  filter(!(A1 != "SOC" & A2 == "SOC")) %>%
+  filter(!(A1 == "SOC" & A2 == "4")) 
+
+# values
+values <- design %>% mutate(val2 = (A2 == "1")*(0.15*(A1 == "1"))
+                  + (A2 == "2")*(0.15*(A1 == 2))
+                  + (A2 == "3")*(0.15*(A1 == 1) + 0.15*(A1 == "2"))) %>%
+  mutate(val1 = (A1 == "1")*(0.15/2 + (0.15/2)*X1) 
+         + (A1 == "2")*(0.15/2 + (-0.15/2)*X1)) %>%
+  mutate(val = val1 + val2)
+
+# optimal dtr and value
+opt <- values %>%
+  mutate(val = val1 + val2) %>%
+  group_by(X1, A1) %>%
+  filter(val2 == max(val2)) %>%
+  group_by(X1) %>%
+  filter(val == max(val))
+```
+
+#### Scenario 2
+
+One treatment (Treatment 1) always dominates, regardless of covariates
+
+```{r, echo = TRUE, results = 'hide'}
+# Coefficients to plug into Y (above)
+beta0 <- list(beta00 = c(0, 0, 0), # Prognostic
+              beta01 = c(0, 0), # SOC
+              beta02 = c(0.15, 0), # Treatment 1
+              beta03 = c(0, 0), # Treatment 2
+              beta04 = c(0, 0)) # Treatment 3
+beta1 <- list(beta11 = c(0, 0, 0, 0), # SOC
+              beta12 = c(0, 0, 0.3, 0.15, 0.3, 0.3, 0), # Treatment 1
+              beta13 = c(0, 0, 0, 0, 0, 0, 0), # Treatment 2
+              beta14 = c(0, 0, 0, 0, 0, 0, 0), # Treatment 3
+              beta15 = c(0, 0, 0, 0, 0, 0)) # Treatment 4
+
+# design
+design <- expand.grid(X1 = c(1, -1),
+            A1 = c("SOC", "1", "2", "3"),
+            A2 = c("SOC", "1", "2", "3", "4")) %>%
+  filter(!(A1 != "SOC" & A2 == "SOC")) %>%
+  filter(!(A1 == "SOC" & A2 == "4")) 
+
+# values
+values <- design %>% mutate(val2 = (A2 == "1")*(0.3*(A1 != "1") + 0.15*(A1 == "1") )) %>%
+  mutate(val1 = (A1 == "1")*0.15) %>%
+  mutate(val = val1 + val2)
+
+# optimal dtr and value
+opt <- values %>%
+  mutate(val = val1 + val2) %>%
+  group_by(X1, A1) %>%
+  filter(val2 == max(val2)) %>%
+  group_by(X1) %>%
+  filter(val == max(val))
+```
+
+### Design 4
+
+**Firstline treatments**: Standard of care, Treatment 1, Treatment 2, Treatment 3
+
+**Secondline treatments**: Treatment 1, Treatment 2, Treatment 3, treatment 4 (step up), SOC (if firstline SOC)
+
+\begin{align*}
+    Y = &\beta_{000} + X_1 \beta_{001} + X_2 \beta_{002} \\
+  & + I(A_1 = SOC)(\beta_{010} + X_1 \beta_{011}) \\
+  & + I(A_1 = Trt\_1)(\beta_{020} + X_1 \beta_{021}) \\
+  & + I(A_1 = Trt\_2)(\beta_{030} + X_1 \beta_{031}) \\
+  & + I(A_1 = Trt\_3)(\beta_{040} + X_1 \beta_{041}) \\
+  & + I(A_1 = Trt\_4)(\beta_{050} + X_1 \beta_{051})\\
+  & + I(A_2 = SOC)(\beta_{110} + X_1 \beta_{111} + I(A_1 = SOC) \beta_{112} + X_2 \beta_{113}) \\
+  & + I(A_2 = Trt\_1)(\beta_{120} + X_1 \beta_{121} + I(A_1 = SOC) \beta_{122} + I(A_1 = Trt\_1) \beta_{123} + I(A_1 = Trt\_2) \beta_{124} + I(A_1 == Trt\_3) \beta_{125} + I(A_1 == Trt\_4) \beta_{126} + X_2 \beta_{127}) \\
+  & + I(A_2 = Trt\_2)(\beta_{130} + X_1 \beta_{131} + I(A_1 = SOC) \beta_{132} + I(A_1 = Trt\_1) \beta_{133} + I(A_1 = Trt\_2) \beta_{134} + I(A_1 == Trt\_3) \beta_{135} + I(A_1 == Trt\_4) \beta_{136} + X_2 \beta_{137}) \\
+  & + I(A_2 = Trt\_3)(\beta_{140} + X_1 \beta_{141} + I(A_1 = SOC) \beta_{142} + I(A_1 = Trt\_1) \beta_{143} + I(A_1 = Trt\_2) \beta_{144} + I(A_1 == Trt\_3) \beta_{145} + I(A_1 == Trt\_4) \beta_{146} + X_2 \beta_{147}) \\
+  & + I(A_2 = Trt\_4)(\beta_{150} + X_1 \beta_{151} + I(A_1 = SOC) \beta_{152} + I(A_1 = Trt\_1) \beta_{153} + I(A_1 = Trt\_2) \beta_{154} + I(A_1 = Trt\_3) \beta_{155} + I(A_1 = Trt\_4) \beta_{156} + X_2 \beta_{157})
+\end{align*}
+
+#### Scenario 1
+
+One optimal DTR has value 0.3. Values are bounded between [0, 0.3].
+(1 --> 3, 2 -->3)
+
+```{r, echo = TRUE, results = 'hide'}
+# Coefficients to plug into Y (above)
+beta0 <- list(beta00 = c(0, 0, 0), # Prognostic
+              beta01 = c(0, 0), # SOC
+              beta02 = c(0.15/2, 0.15/2), # Treatment 1
+              beta03 = c(0.15/2, -0.15/2), # Treatment 2
+              beta04 = c(0, 0), # Treatment 3
+              beta05 = c(0, 0)) # Treatment 4
+beta1 <- list(beta11 = c(0, 0, 0, 0), # SOC
+              beta12 = c(0, 0, 0, 0.15, 0, 0, 0, 0), # Treatment 1
+              beta13 = c(0, 0, 0, 0, 0.15, 0, 0, 0), # Treatment 2
+              beta14 = c(0, 0, 0, 0.15, 0.15, 0, 0, 0), # Treatment 3
+              beta15 = c(0, 0, 0, 0, 0, 0, 0, 0)) # Treatment 4
+
+# design
+design <- expand.grid(X1 = c(1, -1),
+            A1 = c("SOC", "1", "2", "3", "4"),
+            A2 = c("SOC", "1", "2", "3", "4")) %>%
+  filter(!(A1 != "SOC" & A2 == "SOC"))
+
+# values
+values <- design %>% mutate(val2 = (A2 == "1")*(0.15*(A1 == "1"))
+                  + (A2 == "2")*(0.15*(A1 == 2))
+                  + (A2 == "3")*(0.15*(A1 == 1) + 0.15*(A1 == "2"))) %>%
+  mutate(val1 = (A1 == "1")*(0.15/2 + (0.15/2)*X1) 
+         + (A1 == "2")*(0.15/2 + (-0.15/2)*X1)) %>%
+  mutate(val = val1 + val2)
+
+# optimal dtr and value
+opt <- values %>%
+  mutate(val = val1 + val2) %>%
+  group_by(X1, A1) %>%
+  filter(val2 == max(val2)) %>%
+  group_by(X1) %>%
+  filter(val == max(val))
+```
+
+#### Scenario 2
+
+One treatment (Treatment 1) always dominates, regardless of covariates
+
+```{r, echo = TRUE, results = 'hide'}
+# Coefficients to plug into Y (above)
+beta0 <- list(beta00 = c(0, 0, 0), # Prognostic
+              beta01 = c(0, 0), # SOC
+              beta02 = c(0.15, 0), # Treatment 1
+              beta03 = c(0, 0), # Treatment 2
+              beta04 = c(0, 0), # Treatment 3
+              beta05 = c(0, 0)) # Treatment 4
+beta1 <- list(beta11 = c(0, 0, 0, 0), # SOC
+              beta12 = c(0, 0, 0.3, 0.15, 0.3, 0.3, 0.3, 0), # Treatment 1
+              beta13 = c(0, 0, 0, 0, 0, 0, 0, 0), # Treatment 2
+              beta14 = c(0, 0, 0, 0, 0, 0, 0, 0), # Treatment 3
+              beta15 = c(0, 0, 0, 0, 0, 0, 0, 0)) # Treatment 4
+
+# design
+design <- expand.grid(X1 = c(1, -1),
+            A1 = c("SOC", "1", "2", "3"),
+            A2 = c("SOC", "1", "2", "3", "4")) %>%
+  filter(!(A1 != "SOC" & A2 == "SOC")) %>%
+  filter(!(A1 == "SOC" & A2 == "4")) 
+
+# values
+values <- design %>% mutate(val2 = (A2 == "1")*(0.3*(A1 != "1") + 0.15*(A1 == "1") )) %>%
+  mutate(val1 = (A1 == "1")*0.15) %>%
+  mutate(val = val1 + val2)
+
+# optimal dtr and value
+opt <- values %>%
+  mutate(val = val1 + val2) %>%
+  group_by(X1, A1) %>%
+  filter(val2 == max(val2)) %>%
+  group_by(X1) %>%
+  filter(val == max(val))
+```
