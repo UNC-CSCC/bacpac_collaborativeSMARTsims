@@ -1,6 +1,8 @@
 ---
 title: "Simulation plan for PDC meeting on 9 December 2020"
-output: html_notebook
+output:
+  html_document:
+    df_print: paged
 ---
 
 ```{r, message = FALSE, echo = FALSE}
@@ -23,7 +25,7 @@ All of the regimes with tailoring variablwes depend on a single binary baseline 
 **Secondline treatments**: Treatment 1, Treatment 2, Treatment 3 (step-up), SOC (if firstline SOC)
 
 \begin{align*}
-  Y = &\beta_{000} + X_1 \beta_{001} + X_2 \beta_{002} \\
+  \mathbb{E}[Y \vert H_2, A_2]  = &\beta_{000} + X_1 \beta_{001} + X_2 \beta_{002} \\
   & + I(A_1 = SOC)(\beta_{010} + X_1 \beta_{011}) \\
   & + I(A_1 = Trt\_1)(\beta_{020} + X_1 \beta_{021}) \\
   & + I(A_1 = Trt\_2)(\beta_{030} + X_1 \beta_{031}) \\
@@ -100,12 +102,14 @@ opt <- values %>% group_by(X1, A1) %>%
 
 #### Design 2
 
+**This is the design suggested by Kosorok's e-mail--the no augmentation case**
+
 **Firstline treatments**: Standard of care, Treatment 1, Treatment 2, Treatment 3
 
 **Secondline treatments**: Treatment 1, Treatment 2, Treatment 3, SOC (if firstline SOC)
 
 \begin{align*}
-  Y = &\beta_{000} + X_1 \beta_{001} + X_2 \beta_{002} \\
+  \mathbb{E}[Y \vert H_2, A_2] = &\beta_{000} + X_1 \beta_{001} + X_2 \beta_{002} \\
   & + I(A_1 = SOC)(\beta_{010} + X_1 \beta_{011}) \\
   & + I(A_1 = Trt\_1)(\beta_{020} + X_1 \beta_{021}) \\
   & + I(A_1 = Trt\_2)(\beta_{030} + X_1 \beta_{031}) \\
@@ -196,7 +200,7 @@ opt <- values %>%
 **Secondline treatments**: Treatment 1, Treatment 2, Treatment 3, treatment 4 (step up), SOC (if firstline SOC)
 
 \begin{align*}
-  Y = &\beta_{000} + X_1 \beta_{001} + X_2 \beta_{002} \\
+  \mathbb{E}[Y \vert H_2, A_2] = &\beta_{000} + X_1 \beta_{001} + X_2 \beta_{002} \\
   & + I(A_1 = SOC)(\beta_{010} + X_1 \beta_{011}) \\
   & + I(A_1 = Trt\_1)(\beta_{020} + X_1 \beta_{021}) \\
   & + I(A_1 = Trt\_2)(\beta_{030} + X_1 \beta_{031}) \\
@@ -295,14 +299,14 @@ opt <- values %>%
 **Secondline treatments**: Treatment 1, Treatment 2, Treatment 3, treatment 4 (step up), SOC (if firstline SOC)
 
 \begin{align*}
-    Y = &\beta_{000} + X_1 \beta_{001} + X_2 \beta_{002} \\
+    \mathbb{E}[Y \vert H_2, A_2] = &\beta_{000} + X_1 \beta_{001} + X_2 \beta_{002} \\
   & + I(A_1 = SOC)(\beta_{010} + X_1 \beta_{011}) \\
   & + I(A_1 = Trt\_1)(\beta_{020} + X_1 \beta_{021}) \\
   & + I(A_1 = Trt\_2)(\beta_{030} + X_1 \beta_{031}) \\
   & + I(A_1 = Trt\_3)(\beta_{040} + X_1 \beta_{041}) \\
   & + I(A_1 = Trt\_4)(\beta_{050} + X_1 \beta_{051})\\
   & + I(A_2 = SOC)(\beta_{110} + X_1 \beta_{111} + I(A_1 = SOC) \beta_{112} + X_2 \beta_{113}) \\
-  & + I(A_2 = Trt\_1)(\beta_{120} + X_1 \beta_{121} + I(A_1 = SOC) \beta_{122} + I(A_1 = Trt\_1) \beta_{123} + I(A_1 = Trt\_2) \beta_{124} + I(A_1 == Trt\_3) \beta_{125} + I(A_1 == Trt\_4) \beta_{126} + X_2 \beta_{127}) \\
+  & + I(A2 = Trt\_1)(\beta_{120} + X_1 \beta_{121} + I(A_1 = SOC) \beta_{122} + I(A_1 = Trt\_1) \beta_{123} + I(A_1 = Trt\_2) \beta_{124} + I(A_1 == Trt\_3) \beta_{125} + I(A_1 == Trt\_4) \beta_{126} + X_2 \beta_{127}) \\
   & + I(A_2 = Trt\_2)(\beta_{130} + X_1 \beta_{131} + I(A_1 = SOC) \beta_{132} + I(A_1 = Trt\_1) \beta_{133} + I(A_1 = Trt\_2) \beta_{134} + I(A_1 == Trt\_3) \beta_{135} + I(A_1 == Trt\_4) \beta_{136} + X_2 \beta_{137}) \\
   & + I(A_2 = Trt\_3)(\beta_{140} + X_1 \beta_{141} + I(A_1 = SOC) \beta_{142} + I(A_1 = Trt\_1) \beta_{143} + I(A_1 = Trt\_2) \beta_{144} + I(A_1 == Trt\_3) \beta_{145} + I(A_1 == Trt\_4) \beta_{146} + X_2 \beta_{147}) \\
   & + I(A_2 = Trt\_4)(\beta_{150} + X_1 \beta_{151} + I(A_1 = SOC) \beta_{152} + I(A_1 = Trt\_1) \beta_{153} + I(A_1 = Trt\_2) \beta_{154} + I(A_1 = Trt\_3) \beta_{155} + I(A_1 = Trt\_4) \beta_{156} + X_2 \beta_{157})
@@ -379,6 +383,198 @@ design <- expand.grid(X1 = c(1, -1),
 values <- design %>% mutate(val2 = (A2 == "1")*(0.3*(A1 != "1") + 0.15*(A1 == "1") )) %>%
   mutate(val1 = (A1 == "1")*0.15) %>%
   mutate(val = val1 + val2)
+
+# optimal dtr and value
+opt <- values %>%
+  mutate(val = val1 + val2) %>%
+  group_by(X1, A1) %>%
+  filter(val2 == max(val2)) %>%
+  group_by(X1) %>%
+  filter(val == max(val))
+```
+
+
+#### Design 6
+
+**This is the design suggested by Kosorok's e-mail--the augmentation case**
+
+**Firstline treatments**: Standard of care, Treatment 1, Treatment 2, Treatment 3
+
+**Secondline treatments**: Treatment 1, Treatment 2, Treatment 3, SOC (if firstline SOC)
+
+What is different is what are the allowable pathways (`design`).
+
+\begin{align*}
+  \mathbb{E}[Y \vert H_2, A_2] = &\beta_{000} + X_1 \beta_{001} + X_2 \beta_{002} \\
+  & + I(A_1 = SOC)(\beta_{010} + X_1 \beta_{011}) \\
+  & + I(A_1 = Trt\_1)(\beta_{020} + X_1 \beta_{021}) \\
+  & + I(A_1 = Trt\_2)(\beta_{030} + X_1 \beta_{031}) \\
+  & + I(A_1 = Trt\_3)(\beta_{040} + X_1 \beta_{041}) \\
+  & + I(A_2 = SOC)(\beta_{110} + X_1 \beta_{111} + I(A_1 = SOC) \beta_{112} + X_2 \beta_{113}) \\
+  & + I(Trt\_1 \in A_2)(\beta_{120} + X_1 \beta_{121} + I(A_1 = SOC) \beta_{122} + I(A_1 = Trt\_1) \beta_{123} + I(A_1 = Trt\_2) \beta_{124} + I(A_1 == Trt\_3) \beta_{125} + X_2 \beta_{126}) \\
+  & + I(Trt\_2 \in A_2)(\beta_{130} + X_1 \beta_{131} + I(A_1 = SOC) \beta_{132} + I(A_1 = Trt\_1) \beta_{133} + I(A_1 = Trt\_2) \beta_{134} + I(A_1 == Trt\_3) \beta_{135} + X_2 \beta_{136}) \\
+  & + I(Trt\_3 \in A_2)(\beta_{140} + X_1 \beta_{141} + I(A_1 = SOC) \beta_{142} + I(A_1 = Trt\_1) \beta_{143} + I(A_1 = Trt\_2) \beta_{144} + I(A_1 == Trt\_3) \beta_{145} + X_2 \beta_{146}) \\
+\end{align*}
+
+
+#### Scenario 1 -- BROKEN! Don't do this one!
+
+One optimal DTR has value 0.3. (Same as design 2, the only difference is the allowable pathways)
+
+```{r, echo = TRUE, results = 'hide'}
+# Coefficients to plug into Y (above)
+beta0 <- c(beta00 = c(0, 0, 0),
+           beta01 = c(0, 0),
+           beta02 = c(0.15/2, 0.15/2),
+           beta03 = c(0.15/2, -0.15/2),
+           beta04 = c(0, 0))
+beta1 <- c(beta11 = c(0, 0, 0, 0), # SOC
+           beta12 = c(0, 0, 0, 0.15, 0, 0, 0), # Treatment 1
+           beta13 = c(0, 0, 0, 0, 0.15, 0, 0), # Treatment 2
+           beta14 = c(0, 0, 0, 0.15/2, 0.15/2, 0, 0)) # Treatment 3
+
+# Design
+design <- expand.grid(X1 = c(1, -1),
+            A1 = c("SOC", "1", "2", "3"),
+            A2 = c("SOC", "1", "2", "3", "1+2", "2+3", "1+3")) %>%
+  arrange(A1) %>%
+  filter(!(A1 != "SOC" & A2 == "SOC")) %>%
+  filter(!(A1 == "SOC" & str_detect(A2, "\\+"))) %>%
+  filter(!(A1 == "1" & A2 == "2+3")) %>%
+  filter(!(A1 == "2" & A2 == "1+3")) %>%
+  filter(!(A1 == "3" & A2 == "1+2"))
+
+
+
+```
+
+
+#### Scenario 2
+
+One treatment (Treatment 1) always dominates, regardless of covariates (Same as design 2, the only difference is the allowable pathways.) In the case of augmentation, having any amount of Treatment 1 is still dominantly good. 
+
+```{r, echo = TRUE, results = 'hide'}
+# Coefficients to plug into Y (above)
+beta0 <- c(beta00 = c(0, 0, 0),
+           beta01 = c(0, 0),
+           beta02 = c(0.15, 0),
+           beta03 = c(0, 0),
+           beta04 = c(0, 0))
+beta1 <- c(beta11 = c(0, 0, 0, 0), # SOC
+           beta12 = c(0, 0, 0.3, 0.15, 0.3, 0.3, 0), # Treatment 1
+           beta13 = c(0, 0, 0, 0, 0, 0, 0), # Treatment 2
+           beta14 = c(0, 0, 0, 0, 0, 0, 0)) # Treatment 3
+
+# Design
+design <- expand.grid(X1 = c(1, -1),
+            A1 = c("SOC", "1", "2", "3"),
+            A2 = c("SOC", "1", "2", "3", "1+2", "2+3", "1+3")) %>%
+  arrange(A1) %>%
+  filter(!(A1 != "SOC" & A2 == "SOC")) %>%
+  filter(!(A1 == "SOC" & str_detect(A2, "\\+"))) %>%
+  filter(!(A1 == "1" & A2 == "2+3")) %>%
+  filter(!(A1 == "2" & A2 == "1+3")) %>%
+  filter(!(A1 == "3" & A2 == "1+2"))
+
+
+# Values
+values <- design %>% mutate(val2 = str_detect(A2, "1")*(0.3*(A1 == "SOC") + 0.15*(A1 == "1") + 0.3*(A1 == "2") + 0.3*(A1 == "3"))) %>%
+  mutate(val1 = 0.15*(A1 == "1")) %>%
+  mutate(val = val1 + val2)
+# optimal dtr and value
+opt <- values %>%
+  mutate(val = val1 + val2) %>%
+  group_by(X1, A1) %>%
+  filter(val2 == max(val2)) %>%
+  group_by(X1) %>%
+  filter(val == max(val))
+```
+
+#### Scenario 3
+
+Augmentation is always better regardless of covariates. To make this scenario, we need to change how we think about the conditional mean of Y. The difference is an additional indicator if the 2nd stage treatment is augmentation $W$ (operationalized as `str_detect(A2, "\\+")`).
+
+\begin{align*}
+  \mathbb{E}[Y \vert H_2, A_2] = &\beta_{000} + X_1 \beta_{001} + X_2 \beta_{002} \\
+  & + I(A_1 = SOC)(\beta_{010} + X_1 \beta_{011}) \\
+  & + I(A_1 = Trt\_1)(\beta_{020} + X_1 \beta_{021}) \\
+  & + I(A_1 = Trt\_2)(\beta_{030} + X_1 \beta_{031}) \\
+  & + I(A_1 = Trt\_3)(\beta_{040} + X_1 \beta_{041}) \\
+  & + I(A_2 = SOC)(\beta_{110} + X_1 \beta_{111} + I(A_1 = SOC) \beta_{112} + X_2 \beta_{113}) \\
+  & + I(A_2 = Trt\_1)(\beta_{120} + X_1 \beta_{121} + I(A_1 = SOC) \beta_{122} + I(A_1 = Trt\_1) \beta_{123} + I(A_1 = Trt\_2) \beta_{124} + I(A_1 = Trt\_3) \beta_{125} + X_2 \beta_{126} + W \beta_{127}) \\
+  & + I(A_2 = Trt\_2)(\beta_{130} + X_1 \beta_{131} + I(A_1 = SOC) \beta_{132} + I(A_1 = Trt\_1) \beta_{133} + I(A_1 = Trt\_2) \beta_{134} + I(A_1 = Trt\_3) \beta_{135} + X_2 \beta_{136} + W \beta_{137}) \\
+  & + I(A_2 = Trt\_3)(\beta_{140} +\beta_{141} + I(A_1 = SOC) \beta_{142} + I(A_1 = Trt\_1) \beta_{143} + I(A_1 = Trt\_2) \beta_{144} + I(A_1 = Trt\_3) \beta_{145} + X_2 \beta_{146} + W \beta_{147}) \\
+\end{align*}
+
+```{r, echo = TRUE, results = 'hide'}
+# Coefficients to plug into Y (above)
+beta0 <- c(beta00 = c(0, 0, 0),
+           beta01 = c(0, 0),
+           beta02 = c(0, 0),
+           beta03 = c(0, 0),
+           beta04 = c(0, 0))
+beta1 <- c(beta11 = c(0, 0, 0, 0), # SOC
+           beta12 = c(0, 0, 0, 0, 0, 0, 0, 0.15), # Treatment 1
+           beta13 = c(0, 0, 0, 0, 0, 0, 0, 0.15), # Treatment 2
+           beta14 = c(0, 0, 0, 0, 0, 0, 0, 0.15 )) # Treatment 3
+
+# Design
+design <- expand.grid(X1 = c(1, -1),
+            A1 = c("SOC", "1", "2", "3"),
+            A2 = c("SOC", "1", "2", "3", "1+2", "2+3", "1+3")) %>%
+  arrange(A1) %>%
+  filter(!(A1 != "SOC" & A2 == "SOC")) %>%
+  filter(!(A1 == "SOC" & str_detect(A2, "\\+"))) %>%
+  filter(!(A1 == "1" & A2 == "2+3")) %>%
+  filter(!(A1 == "2" & A2 == "1+3")) %>%
+  filter(!(A1 == "3" & A2 == "1+2"))
+
+
+
+# Values
+values <- design %>% mutate(val2 = str_detect(A2, "1")*(0.15*str_detect(A2, "\\+"))
+                            + str_detect(A2, "2")*(0.15*str_detect(A2, "\\+"))
+                            + str_detect(A2, "3")*(0.15*str_detect(A2, "\\+"))) %>%
+  mutate(val1 = 0) %>%
+  mutate(val = val2)
+
+# optimal dtr and value
+opt <- values %>%
+  mutate(val = val1 + val2) %>%
+  group_by(X1, A1) %>%
+  filter(val2 == max(val2)) %>%
+  group_by(X1) %>%
+  filter(val == max(val))
+```
+
+#### Scenario 4
+
+Augmentation always works when X == 1; Getting treatment 1 at anytime and staying on treatment 1 is best when X == 0. To make this scenario, we need to change how we think about the conditional mean of Y. The difference is the interaction between A1, A2, and X1 to allow for augmentation to be X1 specific. We also change the coding of X from 1 to 0.
+
+\begin{align*}
+  \mathbb{E}[Y \vert H_2, A_2] = & I(Trt\_1 \in A_2)[0.3(1-X_1)I(A_1 = SOC) + 0.15(1-X_1)I(A_1 = Trt\_1) + 0.3(1-X_1)I(A_1 = Trt\_2) + 0.3(1-X_1)I(A_1 = Trt\_3) + 0.15 I(W = 1)] \\
+  &+  0.15 I(Trt\_2 \in A_2)I(W = 1) +  0.15 I(Trt\_3 \in A_2)I(W = 1) \\
+  &+ 0.15 (1-X_1) I(A_1 = Trt\_1)
+\end{align*}
+
+```{r}
+# Design
+design <- expand.grid(X1 = c(1, 0),
+            A1 = c("SOC", "1", "2", "3"),
+            A2 = c("SOC", "1", "2", "3", "1+2", "2+3", "1+3")) %>%
+  arrange(A1) %>%
+  filter(!(A1 != "SOC" & A2 == "SOC")) %>%
+  filter(!(A1 == "SOC" & str_detect(A2, "\\+"))) %>%
+  filter(!(A1 == "1" & A2 == "2+3")) %>%
+  filter(!(A1 == "2" & A2 == "1+3")) %>%
+  filter(!(A1 == "3" & A2 == "1+2"))
+
+values <- design %>% mutate(val2 = str_detect(A2, "1")*((0.3)*(1-X1)*(A1 != "1") + 0.15*(1-X1)*(A1 == "1") + 0.15*str_detect(A2, "\\+")*X1)
+                  + str_detect(A2, "2")*(0.15*str_detect(A2, "\\+")*X1)
+                  + str_detect(A2, "3")*(0.15*str_detect(A2, "\\+")*X1)) %>%
+  mutate(val1 = 0.15*(A1 == "1")*(1-X1)) %>%
+  mutate(val = val1 + val2) %>%
+  arrange(X1, val2)
 
 # optimal dtr and value
 opt <- values %>%
