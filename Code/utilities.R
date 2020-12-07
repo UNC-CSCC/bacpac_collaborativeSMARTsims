@@ -96,7 +96,13 @@ generatePossibleTreatmentSequencesGrid <- function(first_line_trts,
                                           augment_trts = NULL,
                                           impermissible_trt_pairs_df = NULL){
   
-  second_stage_options <- c(first_line_trts, second_line_trts, augment_trts)
+  if(all(first_line_trts %in% second_line_trts) == FALSE) {
+    warning("Not all first-line treatments are available in the second-line. 
+    Double check that this is what you want. First-line treatments must be
+    intentionally specified as an available second-line treatment, otherwise they are not included.")
+  }
+  
+  second_stage_options <- c(second_line_trts, augment_trts)
   
   treatment_pairs_df <- expand_grid(A1 = first_line_trts,
                                     A2 = second_stage_options)
@@ -116,7 +122,7 @@ generatePossibleTreatmentSequencesGrid <- function(first_line_trts,
     #Anti-join returns all rows from x without a match in y
     treatment_pairs_df <- anti_join(x = treatment_pairs_df,
                                     y = impermissible_trt_pairs_df,
-                                    by = c("Stage1", "Stage2"))
+                                    by = c("A1", "A2"))
   }
   
   return(treatment_pairs_df)

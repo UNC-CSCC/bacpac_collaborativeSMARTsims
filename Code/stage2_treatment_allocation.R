@@ -54,6 +54,48 @@ allocationFn_stage2_v1 <- function(df, firstLineTreatments,
   return(out)
 }
 
+#' Allocate patients to stage two treatments from a feasible set of treatments
+#' which can depend on the initial treatment and the response status. The treatments
+#' which are possible for stage 2 according to the stage 1 treatment is specified 
+#' through a data frame where rows are valid treatment sequences and the two columns 
+#' are A1 and A2. 
+#' 
+#' In terms of switching rules, currently only supports 
+#' Good = maintain
+#' Okay = stay or switch
+#' bad = switch
+#' What could be switched to is controlled by the trt.options.grid
+#' 
+#' @param df
+#' @param trt.options.grid data frame where rows are valid treatment sequences and columns are stages
+#' 
+#' @return the original data frame with the second line treatment assignment column 
+#' attached (column name A2)
+allocationFn_stage2_trt_grid <- function(df, trt.options.grid, ...){
+  stage2_feasible_trts_by_A1 <- trt.options.grid %>% 
+    group_by(A1) %>%
+    summarise(PossibleByA1 = list(unique(A2)),
+              .groups = 'drop')
+  
+  # Expand the set of possibilities by response status, then apply the logic based on 
+  # response status to define the feasible set for A2
+  stage2_feasible_by_A1_resp_status <- stage2_feasible_trts_by_A1 %>% 
+    expand_grid(respStatus = c("bad", "medium", "good"), .) %>% 
+    rowwise(.) %>% 
+    mutate(FeasibleSet = case_when(respStatus == "good" ~ list(A1),
+                                   respStatus == "bad" ~ list(setdiff(PossibleByA1, A1)),
+                                   respStatus == "medium" ~ list(PossibleByA1),
+                                   TRUE ~ list("I Should be unreachable, investigate if you see me"))) %>% 
+    select(-PossibleByA1)
+  
+  df_w_potential_trts <- left_join(df, stage2_feasible_by_A1_resp_status, by = c("A1", "respStatus")) %>% 
+    rowwise %>% 
+    mutate(A2 = sample(FeasibleSet, size = 1)) %>% 
+    select(-FeasibleSet)
+  
+  return(df_w_potential_trts)
+  
+}
 
 #' Helper function to balance 2nd treatment allocation for those who respond bad
 #'

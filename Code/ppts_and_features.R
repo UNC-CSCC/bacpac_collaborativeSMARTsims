@@ -16,6 +16,7 @@ makePpts <- function(N){
 
 # Make features/covariates ----------------------------------------------------
 
+
 #' Make covariate function that makes independing bernoulli and normal covars
 #'
 #' @param df dataframe; each row should correpsond to a ppt 
@@ -37,7 +38,7 @@ covariateFn_v1 <- function(df, numBinaryCovars, props,
   return(out)
 }
 
-#' Add binary covariates to the generated patients
+#' Add binary covariates to the generated patients that take values in {-1, 1}
 #'
 #' @param df dataframe; at a minimum contains the same number of rows 
 #' as participants
@@ -47,6 +48,31 @@ covariateFn_v1 <- function(df, numBinaryCovars, props,
 #'
 #' @return dataframe with the generated binary covariates appended
 makeBinaryCovars <- function(df, numCovars, props){
+  if(numCovars < 0){
+    warning("Number of binary covariates must be non-negative")
+  } else if(numCovars == 0){
+    return(df)
+  } else{
+    covarNames <- paste("X", 1:numCovars, sep = "_")
+    for(i in 1:numCovars){
+      df <- df %>% rowwise() %>%
+        mutate(!!sym(covarNames[i]) := 2*rbinom(n = 1, size = 1, prob = props[i])-1) %>%
+        ungroup()
+    }
+    return(df)
+  }
+}
+
+#' Add binary covariates to the generated patients that takes value in {0, 1}
+#'
+#' @param df dataframe; at a minimum contains the same number of rows 
+#' as participants
+#' @param numCovars integer; number of binary covariates to add to df
+#' @param props vector of probs; probabilities (proportions) with binary
+#' covariate = 1
+#'
+#' @return dataframe with the generated binary covariates appended
+makeBinaryCovarsZeroOne <- function(df, numCovars, props){
   if(numCovars < 0){
     warning("Number of binary covariates must be non-negative")
   } else if(numCovars == 0){
