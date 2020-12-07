@@ -76,155 +76,111 @@ doQLearningListReturn <- function(dat, moMain_stage2, moCont_stage2,
               stage2 = fit_stage2))
 }
 
+#' Make one out-of-sample data set. Currently (as of 12/6/20) this will be a long data
+#' frame with a row for each out-of-sample patient and hypothetical treatment sequence
+#'
+#' @param metadata list of metadata (N, firstline, secondline, augementation, and SOC treatments)
+#' @param args list of functions and arguments for each key trial design and simulation aspect
+#'
+#' @return long data frame for one out of sample data set 
+#' @export 
 
-# Graveyard -------------------------------------------------------------------
-if(FALSE){
-  #' Make the potential outcomes for stage 1
-  #'
-  #' @param df dataframe; at a minimum contains one row for each ppt
-  #' @param treatment_list list; first element is the number of treatments, 
-  #' second element is the name of each treatment; third element is themean of 
-  #' each treatment, fourth element is the sd of each treatment; fourth element 
-  #' is the randomization prob for each treatment
-  #' @param cf_name character; name to give the vector of counterfactuals
-  #'
-  #' @return dataframe with the counterfactual outcomes for each treatment
-  #' where outcomes are drawn from the normal(mu, sigma)
-  makeStage1PotentialOutcomes <- function(df, treatment_list, cf_name){
-    out <- df %>%
-      group_by(ptid) %>%
-      nest() %>%
-      mutate(!!cf_name := makeCFHelper(data, treatment_list)) %>%
-      select(-data)
+make1OutofSampleSimDataSet <- function(metadata, args){
+ 
+  out <- exec(args$makePpts_fn, !!!args$makePpts_args) %>%
+    exec(args$makeCovariates_fn, !!!args$makeCovariates_args, df = .) %>% 
+    exec(args$MakePOs_fn, !!!args$makePOs_args, indf = .)
+  
+
+  return(out)
+}
+
+#' Create in-sample and out-of-sample performance metrics
+#'
+#' @param metadata list of metadata (N, firstline, secondline, augementation, and SOC treatments)
+#' @param args list of functions and arguments for each key trial design and simulation aspect
+#' @param study.data.list list where each element is a data frame of simulated study data
+#' @param oos.data 
+#'
+#' @return long data frame for one out of sample data set 
+#' @export 
+analyzeSimulationRunsOneSettingWrapper <- function(metadata, args,
+                                                   study.data.list,
+                                                   oos.data){
+  stop("This function is not finished")
+  
+  predicted_sequences <- map(study.data.list, 
+                             ~exec(args$AnalysisModeling_fn, 
+                                   args$AnalysisModeling_args, dat = .)) %>% 
+    map(., 
+        ~exec(args$PredictSequence_fn, args$PredictSequence_args, newdata = oos.data))
+
+  if (is_empty(args$makeInSampleMetrics_fns) == FALSE){
+    # Each entry of args$makeInSampleMetrics_fns is a function for calculating some
+    # in-sample performance metric
     
+    k_in_sample_metrics <- length(args$makeInSampleMetrics_fns)
     
-    return(out)
+    in_sample_metric_results <- vector("list", length = k_in_sample_metrics)
     
-  }
-  
-  #' Helper function for making counterfactuals
-  #'
-  #' @param data df; consequence of nested dataframe
-  #' @param treatment_list list; contains the treatment information
-  #' including the mean and sd for each treatment
-  #'
-  #' @return list; named list with the counterfactual outcomes
-  makeCFHelper <- function(data, treatment_list){
-    out <- map2(treatment_list[["mu_treatments"]], 
-                treatment_list[["sd_treatments"]],
-                rnorm, n = 1) %>%
-      unlist()
-    names(out) <- treatment_list[["treatments"]]
-    out <- list(out)
-    return(out)
-  }
-  
-  
-  #' Assign treatments
-  #'
-  #' @param df dataframe; at a minimum number of rows is equal to the number of participants
-  #' @param treatment_list list; contains treatment information for decision point (given 
-  #' responder status if applicable)
-  #' @param assignment character; name for the treatment assignment, probably A1 or A2
-  allocateTreatments <- function(df, treatment_list, assignment){
-    out <- df %>%
-      rowwise() %>%
-      mutate(!!assignment := sample(x = treatment_list[["treatments"]], 
-                                    size = 1, 
-                                    prob = treatment_list[["probs"]])) 
-    return(out)
-  }
-  
-  getSecondStageTreatmentList <- function(A1, respStatus, 
-                                          treatment_list,
-                                          standardOfCareTreatment,
-                                          firstLineAvailTreatmentsList,
-                                          # augmentableTreatments, 
-                                          augumentationTreatmentsList,
-                                          newTreatmentsList){
-    if(respStatus == "good"){
-      out <- list(n_treatments = 1,
-                  treatments = A1,
-                  mu_treatments = treatment_list[["mu_treatments"]][treatment_list[["treatments"]] == A1],
-                  sd_treatments = treatment_list[["sd_treatments"]][treatment_list[["treatments"]] == A1],
-                  probs = 1)
-      return(out)
-    } else if(respStatus == "bad"){
-      # Available treatments are firstline treatments available at the second randomization
-      # Additional treatments may also be available at the second randomization
-      treatments <- map(list(firstLineAvailTreatmentsList, newTreatmentsList), 
-                        pluck, "treatments") %>%
-        unlist()
-      mu_treatments <- map(list(firstLineAvailTreatmentsList, newTreatmentsList), 
-                           pluck, "mu_treatments") %>%
-        unlist()
-      sd_treatments <- map(list(firstLineAvailTreatmentsList, newTreatmentsList),
-                           pluck, "sd_treatments") %>%
-        unlist()
-      # Secondline treatment cannot be the firstline treatment if doing badly
-      mu_treatments <- mu_treatments[treatments != A1]
-      sd_treatments <- sd_treatments[treatments != A1]
-      treatments <- treatments[treatments != A1]
-      
-      # Create a list for treatment options
-      n_treatments <- length(treatments)
-      out <- list(n_treatments = n_treatments,
-                  treatments = treatments,
-                  mu_treatments = mu_treatments,
-                  sd_treatments = sd_treatments,
-                  probs = rep(1/n_treatments, n_treatments))
-      return(out)
-    } else if(respStatus == "medium"){
-      # Available treatments are firstline treatments available as secondline treatments
-      # Augmentation treatments are available
-      # Additional secondline treatments may also be available
-      treatments <- map(list(firstLineAvailTreatmentsList, 
-                             newTreatmentsList
-                             # , 
-                             # augmentationTreatmentList
-      ), 
-      pluck, "treatments") %>%
-        unlist() 
-      mu_treatments <- map(list(firstLineAvailTreatmentsList, 
-                                newTreatmentsList
-                                # , 
-                                # augmentationTreatmentList
-      ), 
-      pluck, "mu_treatments") %>%
-        unlist()
-      sd_treatments <- map(list(firstLineAvailTreatmentsList, 
-                                newTreatmentsList
-                                # , 
-                                # augmentationTreatmentList
-      ), 
-      pluck, "sd_treatments") %>%
-        unlist()
-      
-      if(A1 == standardOfCareTreatment[["treatments"]]){
-        treatments <- c(treatments, pluck(standardOfCareTreatment, "treatments"))
-        mu_treatments <- c(mu_treatments, pluck(standardOfCareTreatment, "mu_treatments"))
-        sd_treatments <- c(sd_treatments, pluck(standardOfCareTreatment, "sd_treatments"))
-      }
-      n_treatments <- length(treatments)
-      out <- list(n_treatments = n_treatments,
-                  treatments = treatments,
-                  mu_treatments = mu_treatments,
-                  sd_treatments = sd_treatments,
-                  probs = rep(1/n_treatments, n_treatments))
-      return(out)
+    for(cur_index in 1:k_in_sample_metrics) {
+      in_sample_metric_results[[cur_index]] <- map(study.data.list, 
+                                                   ~exec(args$makeInSampleMetrics_fns_list[[cur_index]], 
+                                                         !!!makeInSampleMetrics_args_list[[cur_index]],
+                                                         indf = .))
     }
   }
   
-  
-  makeStage2PotentialOutcomes <- function(data){
-    out <-  map2(data$treatment_list2[[1]][["mu_treatments"]],
-                 data$treatment_list2[[1]][["sd_treatments"]],
-                 rnorm, n = 1) %>%
-      unlist()
-    names(out) <-data$treatment_list2[[1]][["treatments"]]
-    return(out)
+  if (is_empty(args$makeOOSMetrics_fns) == FALSE){
+    # Each entry of args$makeInSampleMetrics_fns is a function for calculating some
+    # in-sample performance metric
+    
+    k_oos_sample_metrics <- length(args$makeOOSMetrics_fns)
+    
+    oos_metric_results <- vector("list", length = k_oos_sample_metrics)
+    
+    for(cur_index in 1:k_oos_sample_metrics) {
+      oos_metric_results[[cur_index]] <- map(study.data.list, 
+                                                   ~exec(args$makeOOSMetrics_fns[[cur_index]], 
+                                                         !!!makeOOSMetrics_args[[cur_index]],
+                                                         oos.data = oos.data,
+                                                         indf = .))
+    }
   }
+  
+  results_list <- c(in_sample_metric_results, oos_metric_results)
+  
+  return(results_list)
+  
 }
+
+#' Calculate percentage of oracle value
+#'
+#' @param metadata list of metadata (N, firstline, secondline, augementation, and SOC treatments)
+#' @param args list of functions and arguments for each key trial design and simulation aspect
+#'
+#' @return long data frame for one out of sample data set 
+#' @export 
+analyzeSimulationRunsPercOracleWrapper <- function(metadata, args,
+                                                   study.data.list,
+                                                   oos.data){
+  
+  oos_vals <- map(study.data.list, 
+                             ~exec(args$AnalysisModeling_fn, 
+                                   !!!args$AnalysisModeling_args, dat = .)) %>% 
+    map(., 
+        ~exec(args$PredictSequence_fn, 
+              dtr_fit_both_stages = .,
+              newdata = oos.data,
+              !!!args$PredictSequence_args)) %>% 
+     map_dfr(., ~getValueDifSummary(., po_grid_df = oos.data)) %>% 
+    mutate(N = rep(metadata$N, times = n()))
+  
+  return(oos_vals)
+}
+
+
+# Specific Step Wrappers ----------------------------------------------------------
 
 #' Make Covariates
 #'

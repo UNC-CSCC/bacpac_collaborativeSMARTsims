@@ -83,7 +83,8 @@ calcTrueMeansAndPOs <- function(indf,
                          outcome_functions_list = outcome_functions_list,
                          outcome_args_list = outcome_args_list) %>% 
     .calcPOsForcePOEqualsObserved(po_df = .,
-                                  patient_df = indf)
+                                  patient_df = indf) %>% 
+    .calcOptTxAndValFromPOs(.)
   
   
   return(indf_with_pos)
@@ -244,4 +245,23 @@ calcTrueMeansAndPOs <- function(indf,
     full_join(., final_pos_wide_df, by = "ptid")
   
   return(pos_wide_df)
+}
+
+
+#' Assumes there is a final, overall outcome Y to determine the optimal treatment 
+#' sequence. 
+
+.calcOptTxAndValFromPOs <- function(mu_df){
+  mu_df <- mu_df %>% 
+    group_by(ptid) %>% 
+    mutate(maxMu = max(Mu),
+           OptA1 = A1[which.max(Mu)],
+           OptA2 = A2[which.max(Mu)],
+           OutcomeUnderOpt = PO[which.max(Mu)],
+           DeltaMu = Mu - maxMu,
+           DeltaPO = PO - OutcomeUnderOpt,
+           .groups = 'drop') %>% 
+    ungroup
+  
+  return(mu_df)
 }

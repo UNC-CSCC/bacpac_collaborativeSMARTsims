@@ -3,7 +3,7 @@ title: "BACPAC Simulation - Code explainer"
 output: html_notebook
 ---
 
-```{r packages and scripts, echo=FALSE, message=FALSE, warning=FALSE, results=}
+```{r packages_and_scripts, echo=FALSE, message=FALSE, warning=FALSE}
 library(tidyverse)
 library(DynTxRegime)
 scripts <- str_subset(list.files(), ".R$")
@@ -109,8 +109,15 @@ The fourth function is `generateY1()`. As you can see now, the general pattern i
 ```{r}
 simDF <- simDF %>%
   generateY1(generateY1Fn = generateNormalY1, 
-               intercept = 1, 
-               coefs = c("X_1" = -1, "W_1" = 1, "A1_2*W_1" = 0.5), 
+               intercept = 3, 
+               coefs = c("X_1" = .25, "W_1" = .1, 
+                         "A1_1" = 1,
+                         "A1_2" = -1,
+                         "A1_3" = 0.5,
+                         "A1_4" = 0.5,
+                         "A1_1*X_1" = 0.75,
+                         "A1_2*X_1" = 0.75,
+                         "A1_4*X_1" = 0.2), 
                sigma = 1)
 
 simDF
@@ -194,6 +201,19 @@ set.seed(309482)
 L <- 10
 # allSimData <- reduce(map(1:L, makeSimDataWrapper, metadata = metadata, args = args), bind_rows)
 allSimData <- map(1:L, makeSimDataWrapper, metadata = metadata, args = args)
+sim_sum <- map_dfr(allSimData, 
+                   ~summarise(.data = ., 
+                              NConsistent = sum(consistent),
+                              N_X11_S1_A1 = sum(X_1 == 1 & respStatus == "good" & A1 == "2"),
+                              N_X11_S2_A2 = sum(X_1 == 1 & A1 == "2" & respStatus != "good" & A2 == "3"),
+                              N_X10_S1_A4 = sum(X_1 == 0 & respStatus == "good" & A1 == "4"),
+                              N_X10_S2_A2 = sum(X_1 == 0 & A1 == "4" & respStatus != "good" & A2 == "2"),
+                              PropConsistent = mean(consistent), 
+                              Prop_X1_A1 = N_X11_S1_A1/n(),
+                              Prop_X11_S2_A2 = N_X11_S2_A2/n(),
+                              Prop_X10_S1_A4 = N_X10_S1_A4/n(),
+                              Prop_X10_S2_A2 = N_X10_S2_A2/n()))
+map_dbl(allSimData, ~mean(.$consistent)) %>% summary
 ```
 
 __Step 5__
@@ -222,14 +242,8 @@ __Step 6__
 We'll generate out-of-sample data from the same population
 
 ```{r oos_data}
-# Set to 1e5
 oosDF <- makePpts(N = 1e3) %>%
-   makeCovariates(covariateFn = covariateFunction, 
-                 numBinaryCovars = numBinaryCovariates, 
-                 props = binaryCovarProps,
-                 numNormalCovars = numNormalCovariates, 
-                 mu = normalCovarMu, 
-                 sd = normalCovarSd)
+   exec(args$makeCovariates_fn, !!!args$makeCovariates_args, df = .) 
 ```
 
 
@@ -245,10 +259,8 @@ oosPOs <- oosDF %>%
                       outcome_args_list = list(args$generateY1_args,
                                                args$generateY2_args,
                                                args$assignResponderStatus_args,
-                                               args$generateY_args)) %>% 
-  calcOptTxAndValFromPOs(.)
+                                               args$generateY_args))
 
-oosPOs %>% select(ptid, A1, A2, Mu, everything())
 ```
 
 Predict Treatment Sequences
@@ -260,8 +272,169 @@ oosTrtSeqEstimates <- map(res_both_stages, ~predictTreatSequence(., newdata = oo
 
 ```
 
-
+Calculate Estimated Value and Percentage of Oracle Value
 
 ```{r}
 oosVals <- map_dfr(oosTrtSeqEstimates, ~getValueDifSummary(., po_grid_df = oosPOs))
+```
+
+
+__Wrapper Example__
+
+
+```{r, include=FALSE, echo=FALSE, message = FALSE}
+# Alternate version of make binary covariates to make them take values in {-1, 1}
+makeBinaryCovars <- function(df, numCovars, props){
+  if(numCovars < 0){
+    warning("Number of binary covariates must be non-negative")
+  } else if(numCovars == 0){
+    return(df)
+  } else{
+    covarNames <- paste("X", 1:numCovars, sep = "_")
+    for(i in 1:numCovars){
+      df <- df %>% rowwise() %>%
+        mutate(!!sym(covarNames[i]) := 2*rbinom(n = 1, size = 1, prob = props[i])-1) %>%
+        ungroup()
+    }
+    return(df)
+  }
+}
+```
+
+Generate simulated studies
+
+```{r metadata_example, echo=FALSE, include=FALSE}
+metadata <- list(N = 600,
+                 firstLineTreatments = as.character(1:4),
+                 secondLineTreatments = as.character(1:6),
+                 standardOfCareTreatment = "1")
+
+args <- list(
+  makePpts_fn = "makePpts",
+  makePpts_args = list(metadata[["N"]]),
+  makeCovariates_fn = "covariateFn_v1",
+  makeCovariates_args = list(numBinaryCovars = 3, props = c(0.6, 0.2, 0.4),
+                             numNormalCovars = 1, mu = 0, sd = 1),
+  allocateStage1Treatments_fn = "allocationFn_stage1_v1",
+  allocateStage1Treatments_args = list(metadata$firstLineTreatments),
+  generateY1_fn = "generateNormalY1",
+  generateY1_args = list(intercept = 0.3, 
+               coefs = c("X_1" = .25, "W_1" = .1, 
+                         "A1_1" = 0.4,
+                         "A1_2" = -0.4,
+                         "A1_3" = 0.25,
+                         "A1_4" = 0.25,
+                         "A1_1*X_1" = 0.3,
+                         "A1_2*X_1" = 0.3,
+                         "A1_4*X_1" = 0.2), 
+               sigma = sqrt(0.5)),
+  assignResponderStatus_fn = "assignResponderStatusByQuantile",
+  assignResponderStatus_args = list(ctsOutcome1 = "Y1", cutoffs = c(0.2, 0.8)),
+  allocateStage2Treatments_fn = "allocationFn_stage2_v1",
+  allocateStage2Treatments_args = list(firstLineTreatments = metadata$firstLineTreatments,
+                                       secondLineTreatments = metadata$secondLineTreatments,
+                                       augmentationTreatments = metadata$augmentationTreatments,
+                                       standardOfCareTreatment = metadata$standardOfCareTreatment),
+  generateY2_fn = "generateY2Fn_v1",
+  generateY2_args = list(coefs = c(
+    "A2_1*X_1" = -0.4, "A2_1*A1_3" = -0.4, "A2_1*A1_4" = 0.4,
+    "A2_2" = -0.4, "A2_2*X_1" = 0.3, "A2_2*A1_1" = 0.2, "A2_2*A1_2" = -0.4, "A2_2*A1_3" = 0, "A2_2*A1_4" = 0.2,    
+    "A2_3" = 0.2, "A2_3*X_1" = 0.4, "A2_3*A1_1" = 0, "A2_3*A1_2" = 0, "A2_3*A1_3" = -0.2, "A2_3*A1_4" = 0.4,
+    "A2_4" = 0.2, "A2_4*X_1" = 0, "A2_4*A1_1" = -1, "A2_4*A1_2" = -0.3, "A2_4*A1_3" = 0, "A2_4*A1_4" = 0.2,  
+    "A2_5" = 0.4, "A2_5*X_1" = -0.4, "A2_5*A1_1" = 0, "A2_5*A1_2" = 0, "A2_5*A1_3" = 0.2, "A2_5*A1_4" = 0.2,
+    "A2_6" = 0, "A2_6*X_1" = 0.2, "A2_6*A1_1" = 0.2, "A2_6*A1_2" = -0.4, "A2_6*A1_3" = -0.4, "A2_6*A1_4" = -0.4),
+    sigma = sqrt(0.5)),
+  generateY_fn = "setYtoY2",
+  generateY_args = list(NA))
+
+
+
+```
+
+
+```{r single_setting_example}
+set.seed(8430)
+# NC Pick 4 Daytime Draw 
+# https://nclottery.com/Pick4
+
+# Create L data sets
+L <- 10
+
+allSimData <- map(1:L, makeSimDataWrapper, metadata = metadata, args = args)
+
+```
+
+Generate out-of-sample data
+
+```{r treatment_grid}
+possibleTreatmentSequences <- generatePossibleTreatmentSequencesGrid(
+  first_line_trts = metadata$firstLineTreatments,
+  second_line_trts = metadata$secondLineTreatments,
+  augment_trts = metadata$augmentationTreatments,
+  impermissible_trt_pairs_df = NULL)
+
+oos_metadata <-  list(nOOS = 1e3,
+                 firstLineTreatments = metadata$firstLineTreatments,
+                 secondLineTreatments = metadata$secondLineTreatments,
+                 standardOfCareTreatment = metadata$standardOfCareTreatment)
+
+oos_args <- list(
+  makePpts_fn = args$makePpts_fn,
+  makePpts_args = list(N = oos_metadata[["nOOS"]]),
+  makeCovariates_fn = args$makeCovariates_fn,
+  makeCovariates_args = args$makeCovariates_args,
+  MakePOs_fn = "calcTrueMeansAndPOs",
+  makePOs_args = list(trt_options_grid = possibleTreatmentSequences,
+                        outcome_functions_list = list(args$generateY1_fn, 
+                                                      args$generateY2_fn,
+                                                      args$assignResponderStatus_fn,
+                                                      args$generateY_fn),
+                        outcome_args_list = list(args$generateY1_args,
+                                                 args$generateY2_args,
+                                                 args$assignResponderStatus_args,
+                                                 args$generateY_args)))
+# This is going to be a long data frame
+oosData <-  make1OutofSampleSimDataSet(metadata = oos_metadata,
+                             args = oos_args)
+
+oosData
+```
+
+Calculate performance metrics
+
+```{r analysis_settings}
+
+# Model specification
+moMain <- modelObj::buildModelObj(model = ~ X_1 + X_2 + X_3 + W_1,
+                                  solver.method = 'lm')
+moCont <- moMain
+
+analysis_metadata <-  list(N = metadata$N,
+                           nOOS = oos_metadata$nOOS,
+                           firstLineTreatments = metadata$firstLineTreatments,
+                           secondLineTreatments = metadata$secondLineTreatments,
+                           standardOfCareTreatment = metadata$standardOfCareTreatment)
+
+analysis_args <- list(AnalysisModeling_fn = "doQLearningListReturn",
+                      AnalysisModeling_args = list("moMain_stage2" = moMain, 
+                                                   "moCont_stage2" = moCont,
+                                                   "moMain_stage1" = moMain, 
+                                                   "moCont_stage1" = moCont),
+                      PredictSequence_fn = "predictTreatSequence",
+                      PredictSequence_args = NULL,
+                      makeInSampleMetrics_fns = NULL,
+                      makeInSampleMetrics_args_list = NULL,
+                      makeOOSMetrics_fns = "",
+                      makeOOSMetrics_args = list())
+
+# This works a little differently than the other wrappers
+# To avoid passing a list containing a list of data, specifically to avoid having
+# args contain a list of the simulation data sets, there are two additional arguments
+
+analysis_summary <- analyzeSimulationRunsPercOracleWrapper(metadata = analysis_metadata, 
+                                       args = analysis_args,
+                                       study.data.list = allSimData,
+                                       oos.data = oosData)
+
+analysis_summary
 ```
