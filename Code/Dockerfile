@@ -6,3 +6,4 @@ RUN apt-get update -y && apt-get install -y azure-cli
 RUN apt-get update -y && apt-get install -y jq emacs
 RUN R -e "devtools::install_github('Azure/rAzureBatch')"
 RUN R -e "devtools::install_github('Azure/doAzureParallel')"
+RUN R -e "devtools::install_github('pROC')"
