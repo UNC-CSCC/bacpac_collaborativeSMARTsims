@@ -40,6 +40,14 @@ All of the regimes with tailoring variablwes depend on a single binary baseline 
 
 One optimal DTR has value 0.3. 
 
+<p style="color:red"> Update on 8 December 2020. Ignore the code below. Please use the following:  
+\begin{align*}
+   \mathbb{E}[Y \vert H_2, A_2] =& 0.15I(A_1 = Trt\_1)X_1 - 0.15I(A_1 = Trt\_2)X_1 + 0.15I(A_2 = Trt\_3)
+\end{align*} 
+
+Note that $X_1 \in \{-1, 1\}$ and that Treatment 3 is always better at stage 2 (regardless of $X_1$). This doesn't push the non-opt DTRs to 0, but does push their value to 1/2 that of the optimal.
+</p>
+
 ```{r, echo = TRUE, results = 'hide'}
 # Coefficients to plug into Y (above)
 beta0 <- list(beta00 = c(0, 0, 0), # prognostic
@@ -75,6 +83,14 @@ opt <- values %>%
 #### Scenario 2
 
 One treatment (Treatment 1) always dominates, regardless of covariates
+
+<p style="color:red"> Update on 8 December 2020. Ignore the code below. Please use the following:  
+\begin{align*}
+   \mathbb{E}[Y \vert H_2, A_2] =& 0.10I(A_1 = Trt\_1) + 0.20I(A_2 = Trt\_2)
+\end{align*} 
+
+Note that Treatment 1 is always dominant.
+</p>
 
 ```{r, echo = TRUE, results = 'hide'}
 # Coefficients to plug into Y (above)

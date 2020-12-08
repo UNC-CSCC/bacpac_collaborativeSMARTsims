@@ -219,6 +219,14 @@ summary {
 <div id="scenario-1" class="section level4">
 <h4>Scenario 1</h4>
 <p>One optimal DTR has value 0.3.</p>
+<p style="color:red">
+Update on 8 December 2020. Ignore the code below. Please use the following:<br />
+
+<span class="math display">\[\begin{align*}
+   \mathbb{E}[Y \vert H_2, A_2] =&amp; 0.15I(A_1 = Trt\_1)X_1 - 0.15I(A_1 = Trt\_2)X_1 + 0.15I(A_2 = Trt\_3)
+\end{align*}\]</span>
+Note that <span class="math inline">\(X_1 \in \{-1, 1\}\)</span> and that Treatment 3 is always better at stage 2 (regardless of <span class="math inline">\(X_1\)</span>). This doesn't push the non-opt DTRs to 0, but does push their value to 1/2 that of the optimal.
+</p>
 <pre class="r"><code># Coefficients to plug into Y (above)
 beta0 &lt;- list(beta00 = c(0, 0, 0), # prognostic
               beta01 = c(0, 0), # SOC
@@ -252,6 +260,14 @@ opt &lt;- values %&gt;%
 <div id="scenario-2" class="section level4">
 <h4>Scenario 2</h4>
 <p>One treatment (Treatment 1) always dominates, regardless of covariates</p>
+<p style="color:red">
+Update on 8 December 2020. Ignore the code below. Please use the following:<br />
+
+<span class="math display">\[\begin{align*}
+   \mathbb{E}[Y \vert H_2, A_2] =&amp; 0.10I(A_1 = Trt\_1) + 0.20I(A_2 = Trt\_2)
+\end{align*}\]</span>
+Note that Treatment 1 is always dominant.
+</p>
 <pre class="r"><code># Coefficients to plug into Y (above)
 beta0 &lt;- list(beta00 = c(0, 0, 0), # prognostic
               beta01 = c(0, 0), # SOC
