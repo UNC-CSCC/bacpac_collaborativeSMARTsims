@@ -11,42 +11,62 @@ scripts <- str_subset(list.files(path = "../Code", full.names = TRUE), ".R$")
 quietly(map(scripts, source))
 ```
 
-## Design 1
+## Design 2
+
+
+#### Design 2
+
+**This is the design suggested by Kosorok's e-mail--the no augmentation case**
+
+**Firstline treatments**: Standard of care, Treatment 1, Treatment 2, Treatment 3
+
+**Secondline treatments**: Treatment 1, Treatment 2, Treatment 3, SOC (if firstline SOC)
+
+\begin{align*}
+  \mathbb{E}[Y \vert H_2, A_2] = &\beta_{000} + X_1 \beta_{001} + X_2 \beta_{002} \\
+  & + I(A_1 = SOC)(\beta_{010} + X_1 \beta_{011}) \\
+  & + I(A_1 = Trt\_1)(\beta_{020} + X_1 \beta_{021}) \\
+  & + I(A_1 = Trt\_2)(\beta_{030} + X_1 \beta_{031}) \\
+  & + I(A_1 = Trt\_3)(\beta_{040} + X_1 \beta_{041}) \\
+  & + I(A_2 = SOC)(\beta_{110} + X_1 \beta_{111} + I(A_1 = SOC) \beta_{112} + X_2 \beta_{113}) \\
+  & + I(A_2 = Trt\_1)(\beta_{120} + X_1 \beta_{121} + I(A_1 = SOC) \beta_{122} + I(A_1 = Trt\_1) \beta_{123} + I(A_1 = Trt\_2) \beta_{124} + I(A_1 == Trt\_3) \beta_{125} + X_2 \beta_{126}) \\
+  & + I(A_2 = Trt\_2)(\beta_{130} + X_1 \beta_{131} + I(A_1 = SOC) \beta_{132} + I(A_1 = Trt\_1) \beta_{133} + I(A_1 = Trt\_2) \beta_{134} + I(A_1 == Trt\_3) \beta_{135} + X_2 \beta_{136}) \\
+  & + I(A_2 = Trt\_3)(\beta_{140} + X_1 \beta_{141} + I(A_1 = SOC) \beta_{142} + I(A_1 = Trt\_1) \beta_{143} + I(A_1 = Trt\_2) \beta_{144} + I(A_1 == Trt\_3) \beta_{145} + X_2 \beta_{146}) \\
+\end{align*}
+
 
 #### Scenario 1
 
 One optimal DTR has value 0.3. 
 
 ```{r, echo = TRUE, results = 'hide'}
-
 # Coefficients to plug into Y (above)
-beta0 <- list(beta00 = c(0, 0, 0), # prognostic
-              beta01 = c(0, 0), # SOC
-              beta02 = c(0.15/2, 0.15/2), # Treatment 1
-              beta03 = c(0.15/2, -0.15/2)) # Treatment 2
+beta0 <- c(beta00 = c(0, 0, 0),
+           beta01 = c(0, 0),
+           beta02 = c(0.15/2, 0.15/2),
+           beta03 = c(0.15/2, -0.15/2),
+           beta04 = c(0, 0))
+beta1 <- c(beta11 = c(0, 0, 0, 0), # SOC
+           beta12 = c(0, 0, 0, 0.15, 0, 0, 0), # Treatment 1
+           beta13 = c(0, 0, 0, 0, 0.15, 0, 0), # Treatment 2
+           beta14 = c(0, 0, 0, 0.15/2, 0.15/2, 0, 0)) # Treatment 3
 
-                #Trt 2 * (1, X1, Trt1 = 1, Trt 1 = 2, 
-beta1 <- list(beta11 = c(0, 0, 0, 0), # SOC
-              beta12 = c(0, 0, 0, 0.15, 0, 0), # Treatment 1
-              beta13 = c(0, 0, 0, 0, 0.15, 0), # Treatment 2
-              beta14 = c(0, 0, 0.15, 0.15, 0)) # Treatment 3
-
-
+# Design
 design <- expand.grid(X1 = c(1, -1),
-            A1 = c("SOC", "1", "2"),
+            A1 = c("SOC", "1", "2", "3"),
             A2 = c("SOC", "1", "2", "3")) %>%
-  filter(!(A1 != "SOC" & A2 == "SOC")) %>%
-  filter(!(A1 == "SOC" & A2 == "3")) 
+  filter(!(A1 != "SOC" & A2 == "SOC")) 
 
 # Values
-values <- design %>% mutate(val2 = (A2 == "3")*((0.15)*(A1 == "1") + (0.15)*(A1 == "2")) 
-         + (A2 == "2")*(0.15*(A1 == "2")) 
-         + (A2 == "1")*(0.15*(A1 == "1"))) %>%
-  mutate(val1 = (A1 == 1)*(0.15/2 + (0.15/2)*X1) + (A1 == 2)*(0.15/2 + (-0.15/2)*X1)) %>%
-  mutate(val = val1 + val2)
+values <- design %>% mutate(val2 = (A2 == "1")*((0.15)*(A1 == "1")) 
+                  + (A2 == "2")*((0.15)*(A1 == "2"))
+                  + (A2 == "3")*((0.15)*(A1 == "1") + (0.15)*(A1 == "2"))) %>%
+  mutate(val1 = (A1 == "1")*(0.15/2 + (0.15/2)*X1) 
+         + (A1 == "2")*(0.15/2 + (-0.15/2)*X1)) 
 
-# Optimal DTR and value
+# optimal dtr and value
 opt <- values %>%
+  mutate(val = val1 + val2) %>%
   group_by(X1, A1) %>%
   filter(val2 == max(val2)) %>%
   group_by(X1) %>%
@@ -59,33 +79,36 @@ One treatment (Treatment 1) always dominates, regardless of covariates
 
 ```{r, echo = TRUE, results = 'hide'}
 # Coefficients to plug into Y (above)
-beta0_scenario2 <- list(beta00 = c(0, 0, 0), # prognostic
-              beta01 = c(0, 0), # SOC
-              beta02 = c(0.15, 0), # Treatment 1
-              beta03 = c(0, 0)) # Treatment 2
+beta0 <- c(beta00 = c(0, 0, 0),
+           beta01 = c(0, 0),
+           beta02 = c(0.15, 0),
+           beta03 = c(0, 0),
+           beta04 = c(0, 0))
+beta1 <- c(beta11 = c(0, 0, 0, 0), # SOC
+           beta12 = c(0, 0, 0.3, 0.15, 0.3, 0.3, 0), # Treatment 1
+           beta13 = c(0, 0, 0, 0, 0, 0, 0), # Treatment 2
+           beta14 = c(0, 0, 0, 0, 0.15, 0, 0)) # Treatment 3
 
-beta1_scenario2 <- list(beta11 = c(0, 0, 0, 0), # SOC
-              beta12 = c(0, 0, 0.3, 0.15, 0.3, 0), # Treatment 1
-              beta13 = c(0, 0, 0, 0, 0, 0), # Treatment 2
-              beta14 = c(0, 0, 0, 0, 0)) # Treatment 3
+# Design
+design <- expand.grid(X1 = c(1, -1),
+            A1 = c("SOC", "1", "2", "3"),
+            A2 = c("SOC", "1", "2", "3")) %>%
+  filter(!(A1 != "SOC" & A2 == "SOC")) 
+
 # Values
-values_scenario2 <- design %>%
-  mutate(val2 = (A2 == "1")*(0.3*(A1 == "SOC") + 0.15*(A1 == "1") + 0.3*(A1 == "2"))) %>%
-  mutate(val1 = (A1 == "1")*0.15) %>%
+values <- design %>% mutate(val2 = (A2 == "1")*(0.3*(A1 == "SOC") + 0.15*(A1 == "1") + 0.3*(A1 == "2") + 0.3*(A1 == "3"))) %>%
+  mutate(val1 = 0.15*(A1 == "1")) %>%
   mutate(val = val1 + val2)
 
-# optimal DTR and values
-opt_scenario2 <- values_scenario2 %>% group_by(X1, A1) %>%
+# optimal dtr and value
+opt <- values %>%
+  mutate(val = val1 + val2) %>%
+  group_by(X1, A1) %>%
   filter(val2 == max(val2)) %>%
-  mutate(val = val2 + val1) %>%
   group_by(X1) %>%
-  filter(val == max(val)) %>% 
-  ungroup %>% 
-  select(-X1) %>% 
-  distinct_at(., .vars = c("A1", "A2"), .keep_all = TRUE)
+  filter(val == max(val))
 
-
-
+#values %>% arrange(A1, A2) %>% select(-X1) %>% distinct_at(., .vars = c("A1", "A2"), .keep_all = TRUE)
 ```
 
 ## 
@@ -93,7 +116,7 @@ Generate simulated studies
 
 ```{r metadata_example, echo=FALSE, include=FALSE}
 metadata <- list(N = 600,
-                 firstLineTreatments = as.character(0:2),
+                 firstLineTreatments = as.character(0:3),
                  secondLineTreatments = as.character(0:3),
                  standardOfCareTreatment = "0")
 
@@ -101,8 +124,12 @@ metadata$possibleTreatmentSequences <- generatePossibleTreatmentSequencesGrid(
   first_line_trts = metadata$firstLineTreatments,
   second_line_trts = metadata$secondLineTreatments,
   augment_trts = metadata$augmentationTreatments,
-  impermissible_trt_pairs_df = bind_rows(expand_grid(A1 = c("1", "2"), A2 = "0"),
-                                         tibble(A1 = "0", A2 = "3")))
+  impermissible_trt_pairs_df = expand_grid(A1 = c("1", "2", "3"), A2 = "0"))
+
+
+values <- design %>% mutate(val2 = (A2 == "1")*((0.15)*(A1 == "1")) 
+                  + (A2 == "2")*((0.15)*(A1 == "2"))
+                  + (A2 == "3")*((0.15)*(A1 == "1") + (0.15)*(A1 == "2"))) 
 
 args <- list(
   makePpts_fn = "makePpts",
@@ -114,18 +141,20 @@ args <- list(
   allocateStage1Treatments_args = list(metadata$firstLineTreatments),
   generateY1_fn = "generateNormalY1",
   generateY1_args = list(intercept = 0, 
-               coefs = c("X_1" = 0, 
-                         "X_2" = 0, "X_1" = 0, "A1_0" = 0, "A1_0*X_1" = 0, "A1_1" = 0.075, "A1_1*X_1" = 0.075, "A1_2" = 0.075, "A1_2*X_1" = -0.075), 
+               coefs = c("A1_1" = 0.15/2,
+                         "A1_1*X_1" = 0.15/2,
+                         "A1_2" = 0.15/2,
+                         "A1_2*X_1" = -0.15/2), 
                sigma = sqrt(0.5)),
   assignResponderStatus_fn = "assignResponderStatusByQuantile",
   assignResponderStatus_args = list(ctsOutcome1 = "Y1", cutoffs = c(0.2, 0.8)),
   allocateStage2Treatments_fn = "allocationFn_stage2_trt_grid",
   allocateStage2Treatments_args = list(trt.options.grid = metadata$possibleTreatmentSequences),
   generateY2_fn = "generateY2Fn_v1",
-  generateY2_args = list(coefs = c("A2_3*A1_1" = 0.15,
-                                   "A2_3*A1_2" = 0.15,
+  generateY2_args = list(coefs = c("A2_1*A1_1" = 0.15,
                                    "A2_2*A1_2" = 0.15,
-                                   "A2_1*A1_1" = 0.15),
+                                   "A2_3*A1_1" = 0.15,
+                                   "A2_3*A1_2" = 0.15),
     sigma = sqrt(0.5)),
   generateY_fn = "setYtoY2",
   generateY_args = list(NA))
@@ -187,14 +216,25 @@ oosData
 ```
 
 ```{r scenario2_mods}
+if (FALSE) {
+  values <- design %>% mutate(val2 = 
+                                (A2 == "1")*(0.3*(A1 == "SOC") + 0.15*(A1 == "1") + 0.3*(A1 == "2") + 0.3*(A1 == "3"))) %>%
+  mutate(val1 = 0.15*(A1 == "1")) %>%
+  mutate(val = val1 + val2)
+  
+  
 generateY1_args_scenario2 = list(intercept = 0, 
                coefs = c("A1_1" = 0.15), 
                sigma = sqrt(0.5))
 
-generateY2_args_scenario2 = list(coefs = c("A2_1*A1_0" = 0.15,
-                                   "A2_1*A1_1" = 0.15,
-                                   "A2_1*A1_2" = 0.3),
-    sigma = sqrt(0.5))
+generateY2_args_scenario2 = list(
+  coefs = c(
+    "A2_1*A1_0" = 0.3,
+    "A2_1*A1_1" = 0.15,
+    "A2_1*A1_2" = 0.3,
+    "A2_1*A1_3" = 0.3),    
+  sigma = sqrt(0.5))
+
 args_scenario2 <- list_modify(args, generateY1_args = generateY1_args_scenario2,
                               generateY2_args = generateY2_args_scenario2) 
 
@@ -208,11 +248,13 @@ oos_args_scenario2 <- list_modify(oos_args,
                                                                                args_scenario2$generateY2_args,
                                                                                args$assignResponderStatus_args,
                                                                                args$generateY_args)))
+}
+
 ```
 
 ```{r check_values}
 oos_vals <- oosData %>% group_by(X_1, A1, A2) %>% summarise(ValOOSFunc = mean(Mu), .groups = "drop") %>% 
-   mutate(A1 = factor(A1, 0:2, labels = c("SOC", 1, 2)),
+   mutate(A1 = factor(A1, 0:3, labels = c("SOC", 1:3)),
           A2 = factor(A2, 0:3, labels = c("SOC", 1:3)))
 
 value_comparison <- values %>% select(X_1 = X1, A1, A2, ValSpec = val) %>% 
