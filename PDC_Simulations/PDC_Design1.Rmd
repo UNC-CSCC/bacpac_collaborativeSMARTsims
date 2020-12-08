@@ -1,0 +1,244 @@
+---
+title: "PDC - Code explainer"
+output: html_notebook
+---
+
+```{r packages_and_scripts, echo=FALSE, message=FALSE, warning=FALSE}
+library(tidyverse)
+library(DynTxRegime)
+
+scripts <- str_subset(list.files(path = "../Code", full.names = TRUE), ".R$")
+quietly(map(scripts, source))
+```
+
+__Scenario 1__
+
+
+#### Scenario 1
+
+One optimal DTR has value 0.3. 
+
+```{r, echo = TRUE, results = 'hide'}
+
+# Coefficients to plug into Y (above)
+beta0 <- list(beta00 = c(0, 0, 0), # prognostic
+              beta01 = c(0, 0), # SOC
+              beta02 = c(0.15/2, 0.15/2), # Treatment 1
+              beta03 = c(0.15/2, -0.15/2)) # Treatment 2
+
+                #Trt 2 * (1, X1, Trt1 = 1, Trt 1 = 2, 
+beta1 <- list(beta11 = c(0, 0, 0, 0), # SOC
+              beta12 = c(0, 0, 0, 0.15, 0, 0), # Treatment 1
+              beta13 = c(0, 0, 0, 0, 0.15, 0), # Treatment 2
+              beta14 = c(0, 0, 0.15, 0.15, 0)) # Treatment 3
+
+
+design <- expand.grid(X1 = c(1, -1),
+            A1 = c("SOC", "1", "2"),
+            A2 = c("SOC", "1", "2", "3")) %>%
+  filter(!(A1 != "SOC" & A2 == "SOC")) %>%
+  filter(!(A1 == "SOC" & A2 == "3")) 
+
+# Values
+values <- design %>% mutate(val2 = (A2 == "3")*((0.15)*(A1 == "1") + (0.15)*(A1 == "2")) 
+         + (A2 == "2")*(0.15*(A1 == "2")) 
+         + (A2 == "1")*(0.15*(A1 == "1"))) %>%
+  mutate(val1 = (A1 == 1)*(0.15/2 + (0.15/2)*X1) + (A1 == 2)*(0.15/2 + (-0.15/2)*X1)) %>%
+  mutate(val = val1 + val2)
+
+# Optimal DTR and value
+opt <- values %>%
+  group_by(X1, A1) %>%
+  filter(val2 == max(val2)) %>%
+  group_by(X1) %>%
+  filter(val == max(val))
+```
+
+Generate simulated studies
+
+```{r metadata_example, echo=FALSE, include=FALSE}
+metadata <- list(N = 600,
+                 firstLineTreatments = as.character(0:2),
+                 secondLineTreatments = as.character(0:3),
+                 standardOfCareTreatment = "0")
+
+metadata$possibleTreatmentSequences <- generatePossibleTreatmentSequencesGrid(
+  first_line_trts = metadata$firstLineTreatments,
+  second_line_trts = metadata$secondLineTreatments,
+  augment_trts = metadata$augmentationTreatments,
+  impermissible_trt_pairs_df = bind_rows(expand_grid(A1 = c("1", "2"), A2 = "0"),
+                                         tibble(A1 = "0", A2 = "3")))
+
+args <- list(
+  makePpts_fn = "makePpts",
+  makePpts_args = list(metadata[["N"]]),
+  makeCovariates_fn = "covariateFn_v1",
+  makeCovariates_args = list(numBinaryCovars = 3, props = c(0.6, 0.2, 0.4),
+                             numNormalCovars = 1, mu = 0, sd = 1),
+  allocateStage1Treatments_fn = "allocationFn_stage1_v1",
+  allocateStage1Treatments_args = list(metadata$firstLineTreatments),
+  generateY1_fn = "generateNormalY1",
+  generateY1_args = list(intercept = 0, 
+               coefs = c("X_1" = 0, 
+                         "X_2" = 0, "X_1" = 0, "A1_0" = 0, "A1_0*X_1" = 0, "A1_1" = 0.075, "A1_1*X_1" = 0.075, "A1_2" = 0.075, "A1_2*X_1" = -0.075), 
+               sigma = sqrt(0.5)),
+  assignResponderStatus_fn = "assignResponderStatusByQuantile",
+  assignResponderStatus_args = list(ctsOutcome1 = "Y1", cutoffs = c(0.2, 0.8)),
+  allocateStage2Treatments_fn = "allocationFn_stage2_trt_grid",
+  allocateStage2Treatments_args = list(trt.options.grid = metadata$possibleTreatmentSequences),
+  generateY2_fn = "generateY2Fn_v1",
+  generateY2_args = list(coefs = c("A2_3*A1_1" = 0.15,
+                                   "A2_3*A1_2" = 0.15,
+                                   "A2_2*A1_2" = 0.15,
+                                   "A2_1*A1_1" = 0.15),
+    sigma = sqrt(0.5)),
+  generateY_fn = "setYtoY2",
+  generateY_args = list(NA))
+
+
+
+```
+
+
+```{r single_setting_example}
+set.seed(8430)
+# NC Pick 4 Daytime Draw 
+# https://nclottery.com/Pick4
+
+# Create L data sets
+L <- 10
+
+allSimData <- map(1:L, makeSimDataWrapper, metadata = metadata, args = args)
+
+```
+
+Generate out-of-sample data
+
+```{r treatment_grid}
+# Sometimes DynTXRegime will predict a sequence as optimal that is not a feasible
+# randomization path
+trts_including_non_feasible <- generatePossibleTreatmentSequencesGrid(
+  first_line_trts = metadata$firstLineTreatments,
+  second_line_trts = metadata$secondLineTreatments,
+  augment_trts = metadata$augmentationTreatments)
+
+oos_metadata <-  list(nOOS = 1e3,
+                 firstLineTreatments = metadata$firstLineTreatments,
+                 secondLineTreatments = metadata$secondLineTreatments,
+                 standardOfCareTreatment = metadata$standardOfCareTreatment)
+
+oos_args <- list(
+  makePpts_fn = args$makePpts_fn,
+  makePpts_args = list(N = oos_metadata[["nOOS"]]),
+  makeCovariates_fn = args$makeCovariates_fn,
+  makeCovariates_args = args$makeCovariates_args,
+  MakePOs_fn = "calcTrueMeansAndPOs",
+  makePOs_args = list(trt_options_grid = trts_including_non_feasible,
+                        outcome_functions_list = list(args$generateY1_fn, 
+                                                      args$generateY2_fn,
+                                                      args$assignResponderStatus_fn,
+                                                      args$generateY_fn),
+                        outcome_args_list = list(args$generateY1_args,
+                                                 args$generateY2_args,
+                                                 args$assignResponderStatus_args,
+                                                 args$generateY_args)))
+# This is going to be a long data frame
+oosData <-  make1OutofSampleSimDataSet(metadata = oos_metadata,
+                             args = oos_args)
+
+oosData
+```
+
+```{r check_values}
+oos_vals <- oosData %>% group_by(X_1, A1, A2) %>% summarise(ValOOSFunc = mean(Mu), .groups = "drop") %>% 
+   mutate(A1 = factor(A1, 0:2, labels = c("SOC", 1, 2)),
+          A2 = factor(A2, 0:3, labels = c("SOC", 1:3)))
+
+value_comparison <- values %>% select(X_1 = X1, A1, A2, ValSpec = val) %>% 
+  left_join(., oos_vals, by = c("X_1", "A1", "A2")) %>% 
+  mutate(ValEquals = ValSpec == ValOOSFunc)
+
+if(all(value_comparison$ValEquals) == FALSE) stop("Uh oh, something bad is happening.")
+```
+
+Calculate performance metrics
+
+```{r analysis_settings}
+
+# Model specification
+moMain <- modelObj::buildModelObj(model = ~ X_1,
+                                  solver.method = 'lm')
+moCont <- moMain
+
+analysis_metadata <-  list(N = metadata$N,
+                           nOOS = oos_metadata$nOOS,
+                           firstLineTreatments = metadata$firstLineTreatments,
+                           secondLineTreatments = metadata$secondLineTreatments,
+                           standardOfCareTreatment = metadata$standardOfCareTreatment)
+
+analysis_args <- list(AnalysisModeling_fn = "doQLearningListReturn",
+                      AnalysisModeling_args = list("moMain_stage2" = moMain, 
+                                                   "moCont_stage2" = moCont,
+                                                   "moMain_stage1" = moMain, 
+                                                   "moCont_stage1" = moCont),
+                      PredictSequence_fn = "predictTreatSequence",
+                      PredictSequence_args = NULL,
+                      makeInSampleMetrics_fns = NULL,
+                      makeInSampleMetrics_args_list = NULL,
+                      makeOOSMetrics_fns = "",
+                      makeOOSMetrics_args = list())
+
+# This works a little differently than the other wrappers
+# To avoid passing a list containing a list of data, specifically to avoid having
+# args contain a list of the simulation data sets, there are two additional arguments
+
+analysis_summary <- analyzeSimulationRunsPercOracleWrapper(metadata = analysis_metadata, 
+                                       args = analysis_args,
+                                       study.data.list = allSimData,
+                                       oos.data = oosData)
+
+analysis_summary %>% colMeans(.)
+```
+
+## Simulation Parameters to Vary
+
+```{r vary_metadata}
+set.seed(8430)
+# NC Pick 4 Daytime Draw 
+# https://nclottery.com/Pick4
+
+metadata_list <- map(c(600, 800, 1000, 1200), ~list_modify(metadata, N = .))
+args_list <- map(c(600, 800, 1000, 1200), ~list_modify(args, makePpts_args = list(.)))
+
+run_sim_flag <- TRUE
+save_sim_data_flag <- FALSE
+
+# Create L data sets
+L <- 10
+
+# knitr's cache option fails if the file size is too large
+if (run_sim_flag == TRUE){
+  sim_data_list <-   map2(.x = metadata_list, 
+                          .y = args_list,
+                          ~map(1:L, makeSimDataWrapper, metadata = .x, args = .y))
+} else{ sim_data_list <- readRDS("sim_data_list_design1.RDS")}
+
+if (save_sim_data_flag == TRUE) saveRDS(sim_data_list, "sim_data_list_design1.RDS")
+```
+
+```{r analysis_results}
+run_analysis_flag <- TRUE
+save_analysis_flag <- FALSE
+
+# Got a weird cache error so here's a janky workaround
+
+if (run_analysis_flag == TRUE) {
+  analysis_results <- map(sim_data_list, ~analyzeSimulationRunsPercOracleWrapper(metadata = analysis_metadata, 
+                                       args = analysis_args,
+                                       study.data.list = .,
+                                       oos.data = oosData))
+} else{
+  analysis_results <- readRDS("design1_analysis.rds")
+}
+if (save_analysis_flag == TRUE) saveRDS(analysis_results, "design1_analysis.rds")
+```

@@ -174,7 +174,7 @@ analyzeSimulationRunsPercOracleWrapper <- function(metadata, args,
               newdata = oos.data,
               !!!args$PredictSequence_args)) %>% 
      map_dfr(., ~getValueDifSummary(., po_grid_df = oos.data)) %>% 
-    mutate(N = rep(metadata$N, times = n()))
+    mutate(N = map_int(study.data.list, nrow))
   
   return(oos_vals)
 }
