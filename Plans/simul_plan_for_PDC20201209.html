@@ -223,7 +223,7 @@ summary {
 Update on 8 December 2020. Ignore the code below. Please use the following:<br />
 
 <span class="math display">\[\begin{align*}
-   \mathbb{E}[Y \vert H_2, A_2] =&amp; 0.15I(A_1 = Trt\_1)X_1 - 0.15I(A_1 = Trt\_2)X_1 + 0.15I(A_2 = Trt\_3)
+   \mathbb{E}[Y \vert H_2, A_2] =&amp; 0.15I(A_1 = 1)X_1 - 0.15I(A_1 = 2)X_1 + 0.15I(A_2 = 3)
 \end{align*}\]</span>
 Note that <span class="math inline">\(X_1 \in \{-1, 1\}\)</span> and that Treatment 3 is always better at stage 2 (regardless of <span class="math inline">\(X_1\)</span>). This doesn't push the non-opt DTRs to 0, but does push their value to 1/2 that of the optimal.
 </p>
@@ -264,7 +264,7 @@ opt &lt;- values %&gt;%
 Update on 8 December 2020. Ignore the code below. Please use the following:<br />
 
 <span class="math display">\[\begin{align*}
-   \mathbb{E}[Y \vert H_2, A_2] =&amp; 0.10I(A_1 = Trt\_1) + 0.20I(A_2 = Trt\_2)
+   \mathbb{E}[Y \vert H_2, A_2] =&amp; 0.10I(A_1 = Trt\_1) + 0.20I(A_2 = Trt\_1)
 \end{align*}\]</span>
 Note that Treatment 1 is always dominant.
 </p>
@@ -310,6 +310,14 @@ opt &lt;- values %&gt;% group_by(X1, A1) %&gt;%
 <div id="scenario-1-1" class="section level4">
 <h4>Scenario 1</h4>
 <p>One optimal DTR has value 0.3.</p>
+<p style="color:red">
+Update on 8 December 2020. Ignore the code below. Please use the following:<br />
+
+<span class="math display">\[\begin{align*}
+   \mathbb{E}[Y \vert H_2, A_2] =&amp; 0.15I(A_1 = Trt\_1)X_1 - 0.15I(A_1 = Trt\_2)X_1 + 0.15I(A_2 = Trt\_3)
+\end{align*}\]</span>
+Note that <span class="math inline">\(X_1 \in \{-1, 1\}\)</span> and that Treatment 3 is always better at stage 2 (regardless of <span class="math inline">\(X_1\)</span>). This doesn't push the non-opt DTRs to 0, but does push their value to 1/2 that of the optimal.
+</p>
 <pre class="r"><code># Coefficients to plug into Y (above)
 beta0 &lt;- c(beta00 = c(0, 0, 0),
            beta01 = c(0, 0),
@@ -344,6 +352,15 @@ opt &lt;- values %&gt;%
 <div id="scenario-2-1" class="section level4">
 <h4>Scenario 2</h4>
 <p>One treatment (Treatment 1) always dominates, regardless of covariates</p>
+<p>One treatment (Treatment 1) always dominates, regardless of covariates</p>
+<p style="color:red">
+Update on 8 December 2020. Ignore the code below. Please use the following:<br />
+
+<span class="math display">\[\begin{align*}
+   \mathbb{E}[Y \vert H_2, A_2] =&amp; 0.10I(A_1 = Trt\_1) + 0.20I(A_2 = Trt\_1)
+\end{align*}\]</span>
+Note that Treatment 1 is always dominant.
+</p>
 <pre class="r"><code># Coefficients to plug into Y (above)
 beta0 &lt;- c(beta00 = c(0, 0, 0),
            beta01 = c(0, 0),
@@ -393,6 +410,14 @@ opt &lt;- values %&gt;%
 <div id="scenario-1-2" class="section level4">
 <h4>Scenario 1</h4>
 <p>One optimal DTR has value 0.3. Values are bounded between [0, 0.3].</p>
+<p style="color:red">
+Update on 8 December 2020. Ignore the code below. Please use the following:<br />
+
+<span class="math display">\[\begin{align*}
+   \mathbb{E}[Y \vert H_2, A_2] =&amp; 0.15I(A_1 = Trt\_1)X_1 - 0.15I(A_1 = Trt\_2)X_1 + 0.15I(A_2 = Trt\_3)
+\end{align*}\]</span>
+Note that <span class="math inline">\(X_1 \in \{-1, 1\}\)</span> and that Treatment 3 is always better at stage 2 (regardless of <span class="math inline">\(X_1\)</span>). This doesn't push the non-opt DTRs to 0, but does push their value to 1/2 that of the optimal.
+</p>
 <pre class="r"><code># Coefficients to plug into Y (above)
 beta0 &lt;- list(beta00 = c(0, 0, 0), # Prognostic
               beta01 = c(0, 0), # SOC
@@ -431,6 +456,14 @@ opt &lt;- values %&gt;%
 <div id="scenario-2-2" class="section level4">
 <h4>Scenario 2</h4>
 <p>One treatment (Treatment 1) always dominates, regardless of covariates</p>
+<p style="color:red">
+Update on 8 December 2020. Ignore the code below. Please use the following:<br />
+
+<span class="math display">\[\begin{align*}
+   \mathbb{E}[Y \vert H_2, A_2] =&amp; 0.10I(A_1 = Trt\_1) + 0.20I(A_2 = Trt\_1)
+\end{align*}\]</span>
+Note that Treatment 1 is always dominant.
+</p>
 <pre class="r"><code># Coefficients to plug into Y (above)
 beta0 &lt;- list(beta00 = c(0, 0, 0), # Prognostic
               beta01 = c(0, 0), # SOC
@@ -464,8 +497,8 @@ opt &lt;- values %&gt;%
   filter(val == max(val))</code></pre>
 </div>
 </div>
-<div id="design-4" class="section level3">
-<h3>Design 4</h3>
+<div id="design-4---8-december-2020-skip-for-now" class="section level3">
+<h3>Design 4 - 8 DECEMBER 2020 SKIP FOR NOW</h3>
 <p><strong>Firstline treatments</strong>: Standard of care, Treatment 1, Treatment 2, Treatment 3</p>
 <p><strong>Secondline treatments</strong>: Treatment 1, Treatment 2, Treatment 3, treatment 4 (step up), SOC (if firstline SOC)</p>
 <span class="math display">\[\begin{align*}
@@ -601,41 +634,20 @@ design &lt;- expand.grid(X1 = c(1, -1),
 <div id="scenario-2-4" class="section level4">
 <h4>Scenario 2</h4>
 <p>One treatment (Treatment 1) always dominates, regardless of covariates (Same as design 2, the only difference is the allowable pathways.) In the case of augmentation, having any amount of Treatment 1 is still dominantly good.</p>
-<pre class="r"><code># Coefficients to plug into Y (above)
-beta0 &lt;- c(beta00 = c(0, 0, 0),
-           beta01 = c(0, 0),
-           beta02 = c(0.15, 0),
-           beta03 = c(0, 0),
-           beta04 = c(0, 0))
-beta1 &lt;- c(beta11 = c(0, 0, 0, 0), # SOC
-           beta12 = c(0, 0, 0.3, 0.15, 0.3, 0.3, 0), # Treatment 1
-           beta13 = c(0, 0, 0, 0, 0, 0, 0), # Treatment 2
-           beta14 = c(0, 0, 0, 0, 0, 0, 0)) # Treatment 3
+<p style="color:red">
+Update on 8 December 2020. Ignore the code below. Please use the following:<br />
 
-# Design
-design &lt;- expand.grid(X1 = c(1, -1),
-            A1 = c(&quot;SOC&quot;, &quot;1&quot;, &quot;2&quot;, &quot;3&quot;),
-            A2 = c(&quot;SOC&quot;, &quot;1&quot;, &quot;2&quot;, &quot;3&quot;, &quot;1+2&quot;, &quot;2+3&quot;, &quot;1+3&quot;)) %&gt;%
-  arrange(A1) %&gt;%
-  filter(!(A1 != &quot;SOC&quot; &amp; A2 == &quot;SOC&quot;)) %&gt;%
-  filter(!(A1 == &quot;SOC&quot; &amp; str_detect(A2, &quot;\\+&quot;))) %&gt;%
-  filter(!(A1 == &quot;1&quot; &amp; A2 == &quot;2+3&quot;)) %&gt;%
-  filter(!(A1 == &quot;2&quot; &amp; A2 == &quot;1+3&quot;)) %&gt;%
-  filter(!(A1 == &quot;3&quot; &amp; A2 == &quot;1+2&quot;))
-
-
-# Values
-values &lt;- design %&gt;% mutate(val2 = str_detect(A2, &quot;1&quot;)*(0.3*(A1 == &quot;SOC&quot;) + 0.15*(A1 == &quot;1&quot;) + 0.3*(A1 == &quot;2&quot;) + 0.3*(A1 == &quot;3&quot;))) %&gt;%
-  mutate(val1 = 0.15*(A1 == &quot;1&quot;)) %&gt;%
-  mutate(val = val1 + val2)
-# optimal dtr and value
-opt &lt;- values %&gt;%
-  mutate(val = val1 + val2) %&gt;%
-  group_by(X1, A1) %&gt;%
-  filter(val2 == max(val2)) %&gt;%
-  group_by(X1) %&gt;%
-  filter(val == max(val))</code></pre>
+<span class="math display">\[\begin{align*}
+   \mathbb{E}[Y \vert H_2, A_2] =&amp; 0.15I(A_1 = Trt\_1) + 0.15I(Trt\_1 \in A_2)
+\end{align*}\]</span>
+Note that Treatment 1 is always dominant.
+</p>
+<p>% arrange(A1) %&gt;% filter(!(A1 != &quot;SOC&quot; &amp; A2 == &quot;SOC&quot;)) %&gt;% filter(!(A1 == &quot;SOC&quot; &amp; str_detect(A2, &quot;\+&quot;))) %&gt;% filter(!(A1 == &quot;1&quot; &amp; A2 == &quot;2+3&quot;)) %&gt;% filter(!(A1 == &quot;2&quot; &amp; A2 == &quot;1+3&quot;)) %&gt;% filter(!(A1 == &quot;3&quot; &amp; A2 == &quot;1+2&quot;))</p>
 </div>
+</div>
+<div id="values" class="section level1">
+<h1>Values</h1>
+<p>values &lt;- design %&gt;% mutate(val2 = str_detect(A2, &quot;1&quot;)<em>(0.3</em>(A1 == &quot;SOC&quot;) + 0.15<em>(A1 == &quot;1&quot;) + 0.3</em>(A1 == &quot;2&quot;) + 0.3<em>(A1 == &quot;3&quot;))) %&gt;% mutate(val1 = 0.15</em>(A1 == &quot;1&quot;)) %&gt;% mutate(val = val1 + val2) # optimal dtr and value opt &lt;- values %&gt;% mutate(val = val1 + val2) %&gt;% group_by(X1, A1) %&gt;% filter(val2 == max(val2)) %&gt;% group_by(X1) %&gt;% filter(val == max(val)) ```</p>
 <div id="scenario-3" class="section level4">
 <h4>Scenario 3</h4>
 <p>Augmentation is always better regardless of covariates. To make this scenario, we need to change how we think about the conditional mean of Y. The difference is an additional indicator if the 2nd stage treatment is augmentation <span class="math inline">\(W\)</span> (operationalized as <code>str_detect(A2, &quot;\\+&quot;)</code>).</p>
@@ -650,6 +662,14 @@ opt &lt;- values %&gt;%
   &amp; + I(A_2 = Trt\_2)(\beta_{130} + X_1 \beta_{131} + I(A_1 = SOC) \beta_{132} + I(A_1 = Trt\_1) \beta_{133} + I(A_1 = Trt\_2) \beta_{134} + I(A_1 = Trt\_3) \beta_{135} + X_2 \beta_{136} + W \beta_{137}) \\
   &amp; + I(A_2 = Trt\_3)(\beta_{140} +\beta_{141} + I(A_1 = SOC) \beta_{142} + I(A_1 = Trt\_1) \beta_{143} + I(A_1 = Trt\_2) \beta_{144} + I(A_1 = Trt\_3) \beta_{145} + X_2 \beta_{146} + W \beta_{147}) \\
 \end{align*}\]</span>
+<p style="color:red">
+Update on 8 December 2020. Ignore the code below. Please use the following:<br />
+
+<span class="math display">\[\begin{align*}
+   \mathbb{E}[Y \vert H_2, A_2] =&amp; 0.3 W_1 + 0.3 W_2 + 0.3 W_3
+\end{align*}\]</span>
+Note that Treatment 1 is always dominant. To operationalize, I believe that you can create new treatments W_1 = agumented with 1 and W_2 = agumented with 2 and W_3 augmented with 3.
+</p>
 <pre class="r"><code># Coefficients to plug into Y (above)
 beta0 &lt;- c(beta00 = c(0, 0, 0),
            beta01 = c(0, 0),
@@ -697,6 +717,13 @@ opt &lt;- values %&gt;%
   &amp;+  0.15 I(Trt\_2 \in A_2)I(W = 1) +  0.15 I(Trt\_3 \in A_2)I(W = 1) \\
   &amp;+ 0.15 (1-X_1) I(A_1 = Trt\_1)
 \end{align*}\]</span>
+<p style="color:red">
+Update on 8 December 2020. Ignore the code below. Please use the following:<br />
+
+<span class="math display">\[\begin{align*}
+   \mathbb{E}[Y \vert H_2, A_2] =&amp; 0.3 W_1 X_1 + 0.3 W_2 X_1 + 0.3 W_3 X_1 -0.15 I(A_2 = 1) X_1 - 0.15 I(A_1 = 1) X_1 + 0.15 X_1
+\end{align*}\]</span>
+</p>
 <pre class="r"><code># Design
 design &lt;- expand.grid(X1 = c(1, 0),
             A1 = c(&quot;SOC&quot;, &quot;1&quot;, &quot;2&quot;, &quot;3&quot;),
