@@ -42,21 +42,24 @@ makeSimDataWrapper <- function(metadata, args, set){
 # Analysis functions ----------------------------------------------------------
 
 doQLearning <- function(dat, moMain_stage2, moCont_stage2,
-                        moMain_stage1, moCont_stage1){
+                        moMain_stage1, moCont_stage1, fSetFunction = NULL){
   
   fit_stage1 <- doQLearningListReturn(dat = dat,
                         moMain_stage2 = moMain_stage2, 
                         moCont_stage2 = moCont_stage2,
                         moMain_stage1 = moMain_stage1, 
-                        moCont_stage1 = moCont_stage1)[[1]]
+                        moCont_stage1 = moCont_stage1,
+                        fSetFunction = fSetFunction)[[1]]
   
   return(fit_stage1)
 }
 
 doQLearningListReturn <- function(dat, moMain_stage2, moCont_stage2,
-                        moMain_stage1, moCont_stage1){
+                        moMain_stage1, moCont_stage1, fSetFunction){
   
   dat$A2 <- factor(dat$A2)
+  dat$A1 <- factor(dat$A1)
+  
   dat <- data.frame(dat)
   
   
@@ -65,7 +68,9 @@ doQLearningListReturn <- function(dat, moMain_stage2, moCont_stage2,
                                     response = dat$Y,
                                     data = dat,
                                     txName = "A2",
+                                    fSet = fSetFunction,
                                     verbose = FALSE)
+  
   fit_stage1 <- DynTxRegime::qLearn(moMain = moMain_stage1,
                                     moCont = moCont_stage1,
                                     response = fit_stage2,
@@ -164,6 +169,7 @@ analyzeSimulationRunsOneSettingWrapper <- function(metadata, args,
 analyzeSimulationRunsPercOracleWrapper <- function(metadata, args,
                                                    study.data.list,
                                                    oos.data){
+  oos_unique <- oos.data %>% distinct_at(., .vars = "ptid", .keep_all = TRUE)
   
   oos_vals <- map(study.data.list, 
                              ~exec(args$AnalysisModeling_fn, 
@@ -171,9 +177,37 @@ analyzeSimulationRunsPercOracleWrapper <- function(metadata, args,
     map(., 
         ~exec(args$PredictSequence_fn, 
               dtr_fit_both_stages = .,
-              newdata = oos.data,
-              !!!args$PredictSequence_args)) %>% 
+              newdata = oos_unique),
+              !!!args$PredictSequence_args) %>% 
      map_dfr(., ~getValueDifSummary(., po_grid_df = oos.data)) %>% 
+    mutate(N = map_int(study.data.list, nrow))
+  
+  return(oos_vals)
+}
+
+#' Calculate percentage of oracle value
+#'
+#' @param metadata list of metadata (N, firstline, secondline, augementation, and SOC treatments)
+#' @param args list of functions and arguments for each key trial design and simulation aspect
+#'
+#' @return long data frame for one out of sample data set 
+#' @export 
+analyzeSimulationRunsPercOracleWrapperParallel <- function(metadata, args,
+                                                   study.data.list,
+                                                   oos.data){
+  
+  oos_vals <- furrr::future_map(study.data.list, 
+                  ~exec(args$AnalysisModeling_fn, 
+                        !!!args$AnalysisModeling_args, dat = .),
+                  .options = furrr::furrr_options(seed = TRUE)) %>% 
+    furrr::future_map(., 
+        ~exec(args$PredictSequence_fn, 
+              dtr_fit_both_stages = .,
+              newdata = oos.data,
+              !!!args$PredictSequence_args),
+        .options = furrr::furrr_options(seed = TRUE)) %>% 
+    furrr::future_map_dfr(., ~getValueDifSummary(., po_grid_df = oos.data),
+                          .options = furrr::furrr_options(seed = TRUE)) %>% 
     mutate(N = map_int(study.data.list, nrow))
   
   return(oos_vals)

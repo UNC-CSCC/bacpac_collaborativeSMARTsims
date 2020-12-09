@@ -2,6 +2,11 @@
 .Rhistory
 .RData
 .Ruserdata
+.Rproj
+
+# R Data sets
+*.rds
+*.RDS
 
 # Personal notes and WIP directories
 Notes
@@ -13,7 +18,9 @@ Code/zzz
 
 # knitr and R markdown default cache directories
 *_cache/
+*_files/
 /cache/
+*/cache/
 
 # Temporary files created by R markdown
 *.utf8.md

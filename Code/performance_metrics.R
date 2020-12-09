@@ -42,11 +42,20 @@ summarizeOptTxAndValFromPOs <- function(mu_df, tailoring_var_names = NULL){
 predictTreatSequence <- function(dtr_fit_both_stages,
                                  newdata,
                                  ...){
-  opt_trt_pred <- tibble(ptid = newdata$ptid,
-                     A1 = DynTxRegime::optTx(dtr_fit_both_stages[[1]], newdata = newdata)$optimalTx,
-                     A2 = DynTxRegime::optTx(dtr_fit_both_stages[[2]], newdata = newdata)$optimalTx)
+
+  opt_trt_pred <- newdata %>% select(-A1, -A2) %>% 
+    mutate(A1 = DynTxRegime::optTx(dtr_fit_both_stages[[1]], newdata = .)$optimalTx)
   
-  return(opt_trt_pred)
+  if ("Y1" %in% colnames(newdata) == FALSE & "Mu1" %in% colnames(newdata) == TRUE) {
+    opt_trt_pred <- opt_trt_pred %>% mutate(Y1 = Mu1)
+  }
+  
+  
+  opt_trt_pred$A2 <- DynTxRegime::optTx(dtr_fit_both_stages[[2]], 
+                                        newdata = as.data.frame(opt_trt_pred))$optimalTx
+                     
+  
+  return(opt_trt_pred %>% select(ptid, A1, A2))
 }
 
 
