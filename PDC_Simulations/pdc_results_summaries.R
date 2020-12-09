@@ -32,14 +32,23 @@ cutoffHelper <- function(indf, cutoff.val, group.vars){
 
 perc_oracle_power <- map_dfr(c(seq(0, .5, by = .1), seq(0.5, 1, by = .005)), ~cutoffHelper(indf = all_designs, cutoff.val = .))
 
-ggplot(data = perc_oracle_power, aes(x = Cutoff, y = Power, color = Design)) + 
-  geom_line() + 
-  xlim(0, 1)+
-  ylim(0,1)+
+plot <- ggplot(data = perc_oracle_power, aes(x = Cutoff, y = Power, color = Design)) + 
+  geom_hline(aes(yintercept = 0.9), color = "black") +
+  geom_vline(aes(xintercept = 0.9), color = "black") +
+  geom_line(size = 0.8) + 
+  # xlim(0, 1)+
+  # ylim(0,1)+
+  scale_x_continuous(breaks = c(0, .2, 0.4, .6, .8,  1)) +
+  scale_y_continuous(breaks = c(0, 0.2, 0.4, 0.6, 0.8, 1)) +
   scale_colour_manual(values = cbp1) + 
   labs(x = "Percentage of Oracle Value Cutoff",
        y = "Probability of Attaining Value Above Cutoff") + 
   facet_grid(cols = vars(Scenario),
              rows = vars(N),
-             labeller = label_both)
+             labeller = label_both) + 
+  theme_minimal() +
+  theme(panel.grid.minor = element_blank(),
+        panel.spacing = unit(2, "lines"), axis.text = element_text(size = 6))
+
+# ggsave(filename = "powerPlot.png", plot = plot, device = "png", width = 7, height = 7)
 
