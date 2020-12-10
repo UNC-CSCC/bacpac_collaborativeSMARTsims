@@ -32,6 +32,33 @@ cutoffHelper <- function(indf, cutoff.val, group.vars){
 
 perc_oracle_power <- map_dfr(c(seq(0, .5, by = .1), seq(0.5, 1, by = .005)), ~cutoffHelper(indf = all_designs, cutoff.val = .))
 
+makePlotForScenario <- function(df){
+  out <- ggplot(data = df, aes(x = Cutoff, y = Power, color = Design)) + 
+    # geom_hline(aes(yintercept = 0.9), color = "black") +
+    # geom_vline(aes(xintercept = 0.9), color = "black") +
+    geom_line(size = 0.8) + 
+    # xlim(0, 1)+
+    # ylim(0,1)+
+    scale_x_continuous(breaks = c(0.5, 0.6, 0.7, 0.8, 0.9, 1),
+                       limits = c(0.5, 1)) +
+    scale_y_continuous(breaks = c(0.5, 0.6, 0.7, 0.8, 0.9, 1),
+                       limits = c(0.5, 1)) +
+    scale_colour_manual(values = cbp1) + 
+    facet_wrap(~N) +
+    labs(x = "Percentage of Oracle Value Cutoff",
+         y = "Probability of Attaining Value Above Cutoff") + 
+    theme_minimal() +
+    theme(panel.grid.minor = element_blank())
+  
+  return(out)
+}
+
+plotSc1 <- makePlotForScenario(filter(perc_oracle_power, Scenario == 1, Power >= 0.5, Cutoff >= 0.5))
+plotSc2 <- makePlotForScenario(filter(perc_oracle_power, Scenario == 2, Power >= 0.5, Cutoff >= 0.5))
+
+ggsave(plot = plotSc1, filename = "powerPlotSc1.png", device = "png")
+ggsave(plot = plotSc2, filename = "powerPlotSc2.png", device = "png")
+
 plot <- ggplot(data = perc_oracle_power, aes(x = Cutoff, y = Power, color = Design)) + 
   geom_hline(aes(yintercept = 0.9), color = "black") +
   geom_vline(aes(xintercept = 0.9), color = "black") +
