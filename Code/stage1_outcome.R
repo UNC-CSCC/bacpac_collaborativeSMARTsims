@@ -66,15 +66,22 @@ makeDummyHelper_A1 <- function(data, A1){
 #' @param coefs named vector of numerics; names should correspond to
 #' covariates and values should correspond to coefficients
 #' @param sigma standard deviation for normal draws
+#' @param include.trt.indicators logical indicating whether the treatment indicators 
+#' should be included in the data set that is returned. 
+#' @param include.mu logical indicating whether the expectation should be included in the data frame as well.
+#' Defaults to FALSE because it can cause name collisions with the out of sample data 
 #'
-#' @return dataframe with Y1 appended
+#' @return dataframe with Y<suffix> appended. Depending on arguments,
+#' may also include A<suffix>_trt inidcator columns or Mu<suffix> expected outcome column
 GenNormalOutcomeByFormula <- function(df,
                         stage.suffix,
                         treatment.arm.df,
                         arm.var.name,
                         true.model.formula, 
                         true.param.vec,
-                        sigma.noise){
+                        sigma.noise,
+                        include.trt.indicators = TRUE,
+                        include.mu = FALSE){
   
   study_data_w_inds <- GenTreatmentIndicators(study.data = df,
                                        treatment.arm.map = treatment.arm.df,
@@ -109,10 +116,14 @@ GenNormalOutcomeByFormula <- function(df,
   outcome_var <- sym(paste0("Y", stage.suffix))
   
   # Calculate the observed outcome (Y<suffix>) and with no noise (Mu<suffix>)
-  data_w_outcomes <- df %>% 
+  data_w_outcomes <- study_data_w_inds %>% 
     ungroup %>% 
     mutate(!!mu_var := c(model_X %*% true.param.vec),
            !!outcome_var := !!mu_var + rnorm(n = n(), mean = 0, sd = sigma.noise))
+  
+  if (include.mu == FALSE) data_w_outcomes <- data_w_outcomes %>% select(-!!mu_var)
+  
+  if (include.trt.indicators == FALSE) data_w_outcomes <- data_w_outcomes %>% select(-starts_with(paste0("A", stage.suffix)))
   
   return(data_w_outcomes)
 }
