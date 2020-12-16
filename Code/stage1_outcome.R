@@ -58,3 +58,61 @@ makeDummyHelper_A1 <- function(data, A1){
   
   return(data)
 }
+
+#' Generate Y<stage.suffix> from Normal distribution as a function of covariates
+#'
+#' @param study.data dataframe; each row corresponds to a ppt
+#' @param stage.suffix 
+#' @param coefs named vector of numerics; names should correspond to
+#' covariates and values should correspond to coefficients
+#' @param sigma standard deviation for normal draws
+#'
+#' @return dataframe with Y1 appended
+GenNormalOutcomeByFormula <- function(df,
+                        stage.suffix,
+                        treatment.arm.df,
+                        arm.var.name,
+                        true.model.formula, 
+                        true.param.vec,
+                        sigma.noise){
+  
+  study_data_w_inds <- GenTreatmentIndicators(study.data = df,
+                                       treatment.arm.map = treatment.arm.df,
+                                       arm.var.name.set = arm.var.name)
+  
+  full_model_X <- model.matrix(true.model.formula, data=study_data_w_inds)
+  
+  unused_columns <- setdiff(colnames(full_model_X), names(true.param.vec))
+  unused_params <- setdiff(names(true.param.vec), colnames(full_model_X))
+  
+  # Make sure the order of the columns matches the parameters
+  model_X <- full_model_X[, names(true.param.vec)]
+  
+  # Check for unused columns or parameters and give a warning if there are any
+  if (any(c(is_empty(unused_columns), is_empty(unused_params)) == FALSE)) {
+    unused_column_string <- paste(unused_columns, collapse = ", ")
+    unused_param_string <- paste(unused_params, collapse = ", ")
+    
+    mismatch_warning_message <- paste0("Column names defined by model formula do not match the parameter names. \n",
+                                       "Columns not in parameter vector: ", unused_column_string, "\n",
+                                       "Parameters not in covariate matrix: ", unused_param_string)
+    warning(mismatch_warning_message)
+  }
+  
+  # Check that the design matrix and the parameter names match
+  # Because we reorder the columns this should never happen
+  if(all(colnames(model_X) == names(true.param.vec)) == FALSE){
+    stop("Covariate matrix columns do not match parameter vector.")
+  }
+  
+  mu_var <- sym(paste0("Mu", stage.suffix))
+  outcome_var <- sym(paste0("Y", stage.suffix))
+  
+  # Calculate the observed outcome (Y<suffix>) and with no noise (Mu<suffix>)
+  data_w_outcomes <- df %>% 
+    ungroup %>% 
+    mutate(!!mu_var := c(model_X %*% true.param.vec),
+           !!outcome_var := !!mu_var + rnorm(n = n(), mean = 0, sd = sigma.noise))
+  
+  return(data_w_outcomes)
+}

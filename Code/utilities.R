@@ -127,3 +127,19 @@ generatePossibleTreatmentSequencesGrid <- function(first_line_trts,
   
   return(treatment_pairs_df)
 }
+
+
+#' Add treatment indicators to study data based on a reference data frame. The values
+#' are determined by the reference data frame which is joined to the study data with the join
+#' variables defined by the user. 
+#' @param study.data data frame containing a column with the arm designation
+#' @param treatment.arm.map data frame where the rows are arms and the columns specify 
+#' the treatment design matrix for the subjects in that arm
+#' @param arm.var.name.set character string or vector specifying the columns to join by
+GenTreatmentIndicators <- function(study.data,
+                                   treatment.arm.map,
+                                   arm.var.name.set){
+  
+  study.data <- left_join(study.data, treatment.arm.map, by = arm.var.name.set)
+  return(study.data)
+}
