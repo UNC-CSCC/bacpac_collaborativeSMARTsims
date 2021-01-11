@@ -215,12 +215,29 @@ if (run_analysis_flag == TRUE) {
   toc()
   
   tic()
+  stage1_power_results_sc1 <- map(sim_data_list[1:length(metadata_settings_scenario1)],
+                                  ~map_dfr(.x = ., ~CalcStage1WaldUnadjustedPvals(study.data = .,
+                                                                              resp.formula = formula(Y1 ~ A1*X_1),
+                                                                              coefs.to.test = c("A11:X_1", "A12:X_1")))) %>% 
+    map(., AdjustPvals)
+  
+  toc()
+  
+  tic()
   analysis_results_sc2 <- map(sim_data_list[(length(metadata_settings_scenario1)+1):length(metadata_list)],
                               ~analyzeSimulationRunsPercOracleWrapper(metadata = analysis_metadata, 
                                                                       args = analysis_args,
                                                                       study.data.list = .,
                                                                       oos.data = oosDataScenario2)) %>% 
     bind_rows(.) %>% mutate(Design = "3", Scenario = "2")
+  toc()
+  
+  tic()
+  stage1_power_results_sc2 <- map(sim_data_list[(length(metadata_settings_scenario1)+1):length(metadata_list)],
+                                  ~map_dfr(.x = ., ~CalcStage1WaldUnadjustedPvals(study.data = .,
+                                                                              resp.formula = formula(Y1 ~ A1),
+                                                                              coefs.to.test = c("A11", "A12")))) %>% 
+    map(., AdjustPvals)
   
   toc()
   
