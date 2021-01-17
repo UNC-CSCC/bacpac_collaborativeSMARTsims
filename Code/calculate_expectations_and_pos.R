@@ -161,6 +161,10 @@ calcTrueMeansAndPOs <- function(indf,
    if ("sigma" %in% names(outcome_args_list[[cur_index]])){
      outcome_args_list[[cur_index]]$sigma <- 0
    } 
+    
+    if ("sigma.noise" %in% names(outcome_args_list[[cur_index]])){
+      outcome_args_list[[cur_index]]$sigma.noise <- 0
+    } 
   }
   
   mudf <- .calcMuGenPOs(podf = mudf,
