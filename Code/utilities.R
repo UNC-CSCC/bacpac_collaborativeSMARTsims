@@ -143,3 +143,34 @@ GenTreatmentIndicators <- function(study.data,
   study.data <- left_join(study.data, treatment.arm.map, by = arm.var.name.set)
   return(study.data)
 }
+
+#' Checks whether the arms match between the observed study data and the data frame
+#' mapping arms to indicators. If there are arms in the map not observed in the data, 
+#' gives a warning. If there are arms in the observed data not in the map it throws an error.
+#' 
+#' @param study.data
+#' @param treatment.arm.map
+CheckArmsMatchDataArmDF <- function(study.data,
+                                    treatment.arm.map){
+  arm_var_name <- treatment.arm.map %>% select(-contains("_")) %>% colnames(.)
+  observed_arms <- study.data %>% pull(all_of(arm_var_name)) %>% unique
+  map_arms <- treatment.arm.map %>% pull(all_of(arm_var_name)) %>% unique
+  
+  not_in_map <- setdiff(observed_arms, map_arms)
+  not_in_observed <- setdiff(map_arms, observed_arms)
+  
+  # Check for mismatched arms and create an informative warning message
+  if (any(c(is_empty(not_in_map), is_empty(not_in_observed)) == FALSE)) {
+    not_in_map_string <- paste(not_in_map, collapse = ", ")
+    not_in_observed_string <- paste(not_in_observed, collapse = ", ")
+    
+    mismatch_warning_message <- paste0("Arms in the observed data do not match the arms in the treatment.arm.map. \n",
+                                       "Arms in study data not in map: ", not_in_map_string, "\n",
+                                       "Arms in map not in study data: ", not_in_observed_string)
+    warning(mismatch_warning_message)
+  }
+  
+  if(is_empty(not_in_map) == FALSE) stop("All study arms must be in the treatment.arm.map")
+  
+  return(TRUE)
+}
