@@ -9,13 +9,14 @@
 #' @param cutoffs vector of quantiles (e.g. c(0.2, 0.8))
 #'
 #' @return dataframe wtih the responder status appended
-assignResponderStatusByQuantile <- function(df, ctsOutcome1, cutoffs){
+assignResponderStatusByQuantile <- function(df, ctsOutcome1, cutoffs, status.labels = c("bad", "medium", "good")){
   out <- df %>%
     group_by(A1) %>%
     mutate(pctRank = percent_rank(!!ensym(ctsOutcome1))) %>%
-    mutate(respStatus = if_else(pctRank <= cutoffs[1], "bad", "medium"),
-           respStatus = if_else(pctRank >= cutoffs[2], 
-                                "good", respStatus))
+    mutate(respStatus = cut(pctRank, 
+                            breaks = c(0, cutoffs, 1), 
+                            include.lowest = TRUE, 
+                            labels = status.labels))
   return(out)
 }
 
@@ -28,13 +29,16 @@ assignResponderStatusByQuantile <- function(df, ctsOutcome1, cutoffs){
 #' @export
 #'
 #' @examples
-assignResponderStatusByNormalQuantileForStdNormalY1 <- function(df, cutoffs){
+assignResponderStatusByNormalQuantileForStdNormalY1 <- function(df, cutoffs,
+                                                                status.labels = c("bad", "medium", "good")){
   out <- df %>% 
     group_by(A1) %>%
     mutate(Y1_std = (Y1 - mean(Y1))/sd(Y1)) %>%
-    mutate(respStatus = if_else(Y1_std <= qnorm(cutoffs[1]), "bad", "medium")) %>%
-    mutate(respStatus = if_else(Y1_std >= qnorm(cutoffs[2]), "good", respStatus)) %>%
+    mutate(respStatus =  cut(Y1_std, 
+                             breaks = c(-Inf, qnorm(cutoffs), Inf), 
+                             labels = status.labels)) %>%
     select(-Y1_std)
   
   return(out)
 }
+

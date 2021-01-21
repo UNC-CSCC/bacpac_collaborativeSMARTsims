@@ -92,9 +92,6 @@ GenNormalOutcomeByFormula <- function(df,
   unused_columns <- setdiff(colnames(full_model_X), names(true.param.vec))
   unused_params <- setdiff(names(true.param.vec), colnames(full_model_X))
   
-  # Make sure the order of the columns matches the parameters
-  model_X <- full_model_X[, names(true.param.vec)]
-  
   # Check for unused columns or parameters and give a warning if there are any
   if (any(c(is_empty(unused_columns), is_empty(unused_params)) == FALSE)) {
     unused_column_string <- paste(unused_columns, collapse = ", ")
@@ -105,6 +102,9 @@ GenNormalOutcomeByFormula <- function(df,
                                        "Parameters not in covariate matrix: ", unused_param_string)
     warning(mismatch_warning_message)
   }
+  
+  # Make sure the order of the columns matches the parameters
+  model_X <- full_model_X[, names(true.param.vec)]
   
   # Check that the design matrix and the parameter names match
   # Because we reorder the columns this should never happen

@@ -97,6 +97,53 @@ allocationFn_stage2_trt_grid <- function(df, trt.options.grid, ...){
   
 }
 
+#' Allocate patients to stage two treatments from a feasible set of treatments
+#' which can depend on the initial treatment and the response status. The treatments
+#' which are possible for stage 2 according to the stage 1 treatment is specified 
+#' through a data frame where rows are valid treatment sequences and the two columns 
+#' are A1 and A2. 
+#' 
+#' In terms of switching rules, currently only supports 
+#' Good = maintain
+#' Okay = stay or switch
+#' bad = switch
+#' What could be switched to is controlled by the trt.options.grid
+#' 
+#' @param df
+#' @param trt.options.grid data frame where rows are valid treatment sequences and columns are stages
+#' In contrast tot he trt.options.grid, the second stage treatments are augmentation treatments involving the treatment from A1
+#' 
+#' @return the original data frame with the second line treatment assignment column 
+#' attached (column name A2)
+allocationFn_stage2_trt_grid_4resps <- function(df, trt.options.grid, lowest_augmentation_trt_number, ...){
+  stage2_feasible_trts_by_A1 <- trt.options.grid %>% 
+    group_by(A1) %>%
+    summarise(PossibleByA1 = list(unique(A2)),
+              .groups = 'drop')
+  
+  # Expand the set of possibilities by response status, then apply the logic based on 
+  # response status to define the feasible set for A2
+  stage2_feasible_by_A1_resp_status <- stage2_feasible_trts_by_A1 %>% 
+    expand_grid(respStatus = c("bad", "medium", "good", "excellent"), .) %>% 
+    rowwise(.) %>% 
+    mutate(FeasibleSet = case_when(respStatus == "excellent" ~ list(A1),
+                                   respStatus == "good" ~ if_else(A1 == "0", 
+                                                                  list(as.character(1:(lowest_augmentation_trt_number-1))),
+                                                                  list(setdiff(PossibleByA1, 0:(lowest_augmentation_trt_number-1) ))),
+                                   respStatus == "bad" ~ list(setdiff(PossibleByA1, A1)),
+                                   respStatus == "medium" ~ list(PossibleByA1),
+                                   TRUE ~ list("I Should be unreachable, investigate if you see me"))) %>% 
+    select(-PossibleByA1)
+  
+  df_w_potential_trts <- left_join(df, stage2_feasible_by_A1_resp_status, by = c("A1", "respStatus")) %>% 
+    rowwise %>% 
+    mutate(A2 = sample(FeasibleSet, size = 1)) %>% 
+    select(-FeasibleSet)
+  
+  return(df_w_potential_trts)
+  
+}
+
 #' Helper function to balance 2nd treatment allocation for those who respond bad
 #'
 #' @param A1 string; first line treatment assigned

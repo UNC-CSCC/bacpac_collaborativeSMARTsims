@@ -74,7 +74,7 @@ QLearning <- function(indf,
   # --- Stage One
   
   stage1_data <- .QLearningConstructDataList(in.formula = stage1.formula,
-                                             in.data = indf_w_pseudo, 
+                                             in.data = indf_w_preds, 
                                              ...)
   
   stage1_fit <- switch(model.type,
@@ -87,6 +87,52 @@ QLearning <- function(indf,
                     model.class = class(stage1_fit))
   
   return(to_return)
+}
+
+
+#' This is a function which takes advantage of the long (one row per ptid and arm) 
+#' out-of-sample
+#' 
+#' @param q.mod the resulting object from the \code{QLearning} function which is a list
+#' where the models for both stages are present
+#' @param oos.data out-of-sample data created by \code{make1OutofSampleSimDataSet}
+#'  this will be a long data frame with a row for each out-of-sample patient and hypothetical treatment sequence
+#'  
+#' @return an {n out-of-sample} by 3 data set where the columns are the ID (ptid),
+#' the estimated optimal arm at stage 1 (A1hat) and stage 2 (A2hat)
+PredictOptSeqQLearningOOS <- function(q.mod, oos.data) {
+  est_seq_df <- oos.data %>% 
+    mutate(Q1pred = predict(q.mod$Stage1Mod, oosData),
+           Q2pred = predict(q.mod$Stage2Mod, oosData)) %>% 
+  group_by(ptid) %>% 
+    summarise(A1Hat = A1[which.max(Q1pred)],
+              A2Hat = A2[which.max(Q2pred)],
+              MuAhat = Mu[which.max(Q1pred + Q2pred)],
+              maxMu = maxMu[1],
+              DeltaMuAhat = DeltaMu[which.max(Q1pred + Q2pred)],
+              PercOracle = max(0, MuAhat/maxMu),
+              .groups = "drop_last")
+  
+  return(est_seq_df)
+}
+
+#' This is a function which takes advantage of the long (one row per ptid and arm) 
+#' out-of-sample
+#' 
+#' @param q.mod the resulting object from the \code{QLearning} function which is a list
+#' where the models for both stages are present
+#' @param oos.data out-of-sample data created by \code{make1OutofSampleSimDataSet}
+#'  this will be a long data frame with a row for each out-of-sample patient and hypothetical treatment sequence
+#'  
+#' @return a single row data frame with columns for Oracle performance measures
+PercOracleQLearningOOS <- function(q.mod, oos.data){
+  perf_summary <- PredictOptSeqQLearningOOS(q.mod = q.mod, oos.data = oos.data) %>% 
+    summarize(MeanVal = mean(MuAhat),
+              OracleVal = mean(maxMu),
+              PercOracle = mean(MuAhat)/mean(maxMu),
+              DifOracle = OracleVal - MeanVal)
+  
+  return(perf_summary)
 }
 
 ################################################################################
@@ -117,7 +163,8 @@ QLearning <- function(indf,
     left_join(., trt_po_names_and_position, by = "A2") %>% 
     group_by(A1) %>% 
     summarise(ImpermissibleArmNames = list(A2),
-              ImpermissibleArmPositions = list(Position))
+              ImpermissibleArmPositions = list(Position),
+              .groups = "drop_last")
   
   indf_with_pseudo <- indf.with.pred.pos %>% 
     left_join(., impermissible_list_form, by = "A1") %>% 
