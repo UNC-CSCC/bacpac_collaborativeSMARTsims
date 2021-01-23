@@ -1,0 +1,81 @@
+---
+title: "Working Design 1-14-21"
+output: html_notebook
+---
+
+```{r packages_and_scripts, echo=FALSE, message=FALSE, warning=FALSE}
+library(tidyverse)
+library(DynTxRegime)
+
+scripts <- str_subset(list.files(path = "../Code", full.names = TRUE), ".R$")
+quietly(map(scripts, source))
+```
+
+
+
+## Design
+
+### Interventions
+
+This design reflects the interventions currently under consideration (as of 01/14/21). 
+
+**Firstline treatments**: "Enhanced light touch" usual care, ACT, Duloxetine, Classification-based PT
+
+**Secondline treatments**: "Enhanced light touch" usual care (If firstline was usual care), ACT, Duloxetine, Classification-based PT
+
+**Augmentation treatments**: ACT, Duloxetine, Classification-based PT in addition to current treatment
+
+#### "Best Guess" Treatment Effects
+
+| Intervention      | Standardized Effect Size | Source |
+| :-----------: | :-----------: | :-----------: |
+| Enhanced usual care      | .1       | ADEG Meeting  |
+| ACT   | .25-.30        | Dr. Clauw |
+| Duloxetine   | .3-.35        | Dr. Clauw |
+| Targeted PT   | .35-.4        | John looking at IWG Spreadsheet |
+
+
+#### Outcome Model
+
+\begin{align*}
+  \mathbb{E}[Y \vert H_2, A_2] = &\beta_{000} + X_1 \beta_{001} + X_2 \beta_{002} \\
+  & + I(A_1 = SOC)(\beta_{010} + X_1 \beta_{011}) \\
+  & + I(A_1 = Trt\_1)(\beta_{020} + X_1 \beta_{021}) \\
+  & + I(A_1 = Trt\_2)(\beta_{030} + X_1 \beta_{031}) \\
+  & + I(A_1 = Trt\_3)(\beta_{040} + X_1 \beta_{041}) \\
+  & + I(A_2 = SOC)(\beta_{110} + X_1 \beta_{111} + I(A_1 = SOC) \beta_{112} + X_2 \beta_{113}) \\
+  & + I(A_2 = Trt\_1)(\beta_{120} + X_1 \beta_{121} + I(A_1 = SOC) \beta_{122} + I(A_1 = Trt\_1) \beta_{123} + I(A_1 = Trt\_2) \beta_{124} + I(A_1 == Trt\_3) \beta_{125} + X_2 \beta_{126}) \\
+  & + I(A_2 = Trt\_2)(\beta_{130} + X_1 \beta_{131} + I(A_1 = SOC) \beta_{132} + I(A_1 = Trt\_1) \beta_{133} + I(A_1 = Trt\_2) \beta_{134} + I(A_1 == Trt\_3) \beta_{135} + X_2 \beta_{136}) \\
+  & + I(A_2 = Trt\_3)(\beta_{140} + X_1 \beta_{141} + I(A_1 = SOC) \beta_{142} + I(A_1 = Trt\_1) \beta_{143} + I(A_1 = Trt\_2) \beta_{144} + I(A_1 == Trt\_3) \beta_{145} + X_2 \beta_{146}) \\
+  & + I(A_2 = Trt\_4)(\beta_{150} + X_1 \beta_{151} + I(A_1 = Trt\_1) \beta_{152} + I(A_1 = Trt\_2) \beta_{153} + I(A_1 = Trt\_3) \beta_{154} + X_2 \beta_{155})
+\end{align*}
+
+## Scenarios
+
+### Pessimistic Best Guess
+
+We assumes that the usual care intervention is at the upper end and the interventions at the lower end
+of the best guess effect size range for the pessimistic best guess scenario. 
+
+| Intervention      | Standardized Effect Size | 
+| :-----------: | :-----------: | 
+| Enhanced usual care      | .2  | 
+| ACT   | .25       | 
+| Duloxetine   | .3   | 
+| Targeted PT   | .35  | 
+
+
+### Optimistic Best Guess
+
+We assumes that the usual care intervention is at the lower end and the interventions at the upper end
+of the best guess effect size range for the optimistic best guess scenario. 
+
+
+| Intervention      | Standardized Effect Size | 
+| :-----------: | :-----------: | 
+| Enhanced usual care      | .15  | 
+| ACT   | .3       | 
+| Duloxetine   | .35   | 
+| Targeted PT   | .4  | 
+
+
