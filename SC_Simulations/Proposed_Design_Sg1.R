@@ -21,8 +21,8 @@ quietly(map(scripts, source))
 ##------------------------------------------------------------------------------
 ## Settings: Simulation Run meta-settings
 ##------------------------------------------------------------------------------
-# Seed is from the NC Pick 4 Daytime Draw Sunday, Jan 17  https://nclottery.com/Pick4
-seed_to_use <-2814
+# Seed is from the NC Pick 4 Daytime Draw Sunday, Jan 24  https://nclottery.com/Pick4
+seed_to_use <- 8632
 set.seed(seed_to_use)
 
 
@@ -64,11 +64,11 @@ read_analysis_file_string <- NULL
 
 if (run_analysis_flag == TRUE & is_null(read_analysis_file_string) == FALSE) stop("run_analysis_flag must be FALSE if read_analysis_file_string is specified")
 
-save_analysis_flag <- TRUE
+save_analysis_flag <- FALSE
 save_analysis_file_string <-  "../SimRuns/performance_best_guess_sg1.RDS"
 
 # Create L data sets per setting
-L <- 5
+L <- 1000
 
 ##------------------------------------------------------------------------------
 ## Settings: Simulated Study Data Generation
@@ -268,12 +268,22 @@ if (run_analysis_flag == TRUE) {
   
   tic()
   
+  
+  
+  #fitted_model_type <- class(q.mod$Stage1Mod)
+  stage1_data <- .QLearningConstructCovariateMatrix(in.formula = update(analysis_args$AnalysisModeling_args$stage1.formula, 1 ~ .),
+                                                    in.data = oosData, 
+                                                    create.intercept = FALSE)
+  
+  stage2_data <- .QLearningConstructCovariateMatrix(in.formula = update(analysis_args$AnalysisModeling_args$stage2.formula, 1 ~ .),
+                                                    in.data = oosData, 
+                                                    create.intercept = FALSE)
   ### Warning - hard coding here
   # TODO - Remove hard coding of N
   oracle_summary <- map(q_mods_list, 
                         ~map_dfr(.x = ., ~PercOracleQLearningOOS(q.mod = ., oos.data = oosData,
-                                                                 stage1.formula = update(analysis_args$AnalysisModeling_args$stage1.formula, 1 ~ .),
-                                                                 stage2.formula = update(analysis_args$AnalysisModeling_args$stage2.formula,1 ~ .)))) %>% 
+                                                                 stage1.data = stage1_data,
+                                                                 stage2.data = stage2_data))) %>% 
     bind_rows(., .id = "Scenario") %>% 
     left_join(., y = tibble(Scenario = as.character(1:3), N = c(800, 1000, 1200)), by = "Scenario")
   

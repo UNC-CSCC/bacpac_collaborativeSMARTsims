@@ -101,23 +101,16 @@ QLearning <- function(indf,
 #' @return an {n out-of-sample} by 3 data set where the columns are the ID (ptid),
 #' the estimated optimal arm at stage 1 (A1hat) and stage 2 (A2hat)
 PredictOptSeqQLearningOOS <- function(q.mod, 
-                                      stage1.formula,
-                                      stage2.formula,
+                                      stage1.data,
+                                      stage2.data,
                                       oos.data,
                                       ...) {
-  #fitted_model_type <- class(q.mod$Stage1Mod)
-  stage1_data <- .QLearningConstructCovariateMatrix(in.formula = stage1.formula,
-                                                    in.data = oos.data, 
-                                                    create.intercept = FALSE)
+ 
   
-  stage2_data <- .QLearningConstructCovariateMatrix(in.formula = stage2.formula,
-                                                    in.data = oos.data, 
-                                                    create.intercept = FALSE)
   
-  predict(q.mod$Stage1Mod, oos.data)
   est_seq_df <- oos.data %>% 
-    mutate(Q1pred = .QLearningStagePredict(fitted.model = q.mod$Stage1Mod, data.to.pred = (stage1_data)),
-           Q2pred = .QLearningStagePredict(fitted.model = q.mod$Stage2Mod, data.to.pred = (stage2_data))) %>% 
+    mutate(Q1pred = .QLearningStagePredict(fitted.model = q.mod$Stage1Mod, data.to.pred = (stage1.data)),
+           Q2pred = .QLearningStagePredict(fitted.model = q.mod$Stage2Mod, data.to.pred = (stage2.data))) %>% 
   group_by(ptid) %>% 
     summarise(A1Hat = A1[which.max(Q1pred)],
               A2Hat = A2[which.max(Q2pred)],
