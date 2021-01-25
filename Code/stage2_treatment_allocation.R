@@ -127,11 +127,11 @@ allocationFn_stage2_trt_grid_4resps <- function(df, trt.options.grid, lowest_aug
     expand_grid(respStatus = c("bad", "medium", "good", "excellent"), .) %>% 
     rowwise(.) %>% 
     mutate(FeasibleSet = case_when(respStatus == "excellent" ~ list(A1),
-                                   respStatus == "good" ~ if_else(A1 == "0", 
-                                                                  list(as.character(1:(lowest_augmentation_trt_number-1))),
-                                                                  list(setdiff(PossibleByA1, 0:(lowest_augmentation_trt_number-1) ))),
-                                   respStatus == "bad" ~ list(setdiff(PossibleByA1, A1)),
-                                   respStatus == "medium" ~ list(PossibleByA1),
+                                   respStatus == "good" ~ list(setdiff(PossibleByA1, 0:(lowest_augmentation_trt_number-1))),
+                                   respStatus == "bad" ~ if_else(A1 == "0",
+                                                                 list(setdiff(PossibleByA1, A1)),
+                                                                 list(setdiff(as.character(1:(lowest_augmentation_trt_number-1)), A1))),
+                                   respStatus == "medium" ~ list(setdiff(PossibleByA1, A1)),
                                    TRUE ~ list("I Should be unreachable, investigate if you see me"))) %>% 
     select(-PossibleByA1)
   

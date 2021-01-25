@@ -100,13 +100,30 @@ QLearning <- function(indf,
 #'  
 #' @return an {n out-of-sample} by 3 data set where the columns are the ID (ptid),
 #' the estimated optimal arm at stage 1 (A1hat) and stage 2 (A2hat)
-PredictOptSeqQLearningOOS <- function(q.mod, oos.data) {
+PredictOptSeqQLearningOOS <- function(q.mod, 
+                                      stage1.formula,
+                                      stage2.formula,
+                                      oos.data,
+                                      ...) {
+  #fitted_model_type <- class(q.mod$Stage1Mod)
+  stage1_data <- .QLearningConstructCovariateMatrix(in.formula = stage1.formula,
+                                                    in.data = oos.data, 
+                                                    create.intercept = FALSE)
+  
+  stage2_data <- .QLearningConstructCovariateMatrix(in.formula = stage2.formula,
+                                                    in.data = oos.data, 
+                                                    create.intercept = FALSE)
+  
+  predict(q.mod$Stage1Mod, oos.data)
   est_seq_df <- oos.data %>% 
-    mutate(Q1pred = predict(q.mod$Stage1Mod, oosData),
-           Q2pred = predict(q.mod$Stage2Mod, oosData)) %>% 
+    mutate(Q1pred = .QLearningStagePredict(fitted.model = q.mod$Stage1Mod, data.to.pred = (stage1_data)),
+           Q2pred = .QLearningStagePredict(fitted.model = q.mod$Stage2Mod, data.to.pred = (stage2_data))) %>% 
   group_by(ptid) %>% 
     summarise(A1Hat = A1[which.max(Q1pred)],
               A2Hat = A2[which.max(Q2pred)],
+              A1Opt = A1[Mu == maxMu],
+              A2Opt = A2[Mu == maxMu],
+              ReceivedBest = (A1Hat == A1Opt) & (A2Hat == A2Opt),
               MuAhat = Mu[which.max(Q1pred + Q2pred)],
               maxMu = maxMu[1],
               DeltaMuAhat = DeltaMu[which.max(Q1pred + Q2pred)],
@@ -125,11 +142,12 @@ PredictOptSeqQLearningOOS <- function(q.mod, oos.data) {
 #'  this will be a long data frame with a row for each out-of-sample patient and hypothetical treatment sequence
 #'  
 #' @return a single row data frame with columns for Oracle performance measures
-PercOracleQLearningOOS <- function(q.mod, oos.data){
-  perf_summary <- PredictOptSeqQLearningOOS(q.mod = q.mod, oos.data = oos.data) %>% 
+PercOracleQLearningOOS <- function(q.mod, oos.data, ...){
+  perf_summary <- PredictOptSeqQLearningOOS(q.mod = q.mod, oos.data = oos.data, ...) %>% 
     summarize(MeanVal = mean(MuAhat),
               OracleVal = mean(maxMu),
               PercOracle = mean(MuAhat)/mean(maxMu),
+              PercReceivingBestTrt = mean(ReceivedBest),
               DifOracle = OracleVal - MeanVal)
   
   return(perf_summary)
@@ -212,12 +230,8 @@ PercOracleQLearningOOS <- function(q.mod, oos.data){
       .QLearningConstructCovariateMatrix(in.formula = model.formula,
                                   in.data = .)
     
-    prediction_mat[, cur_index] <- switch(fitted_model_type,
-      lm = predict(fitted.model, newdata = as.data.frame(counterfactual_data)),
-      cv.glmnet = glmnet:::predict.cv.glmnet(fitted.model, 
-                                         newx = as.matrix(counterfactual_data[, -str_detect(colnames(counterfactual_data), "(Intercept)")]), #For whatever reason glmnet doesn't want x to have an intercept column
-                                         s = "lambda.min"),
-      randomForest = randomForest:::predict.randomForest(fitted.model, newdata = counterfactual_data))
+    prediction_mat[, cur_index] <- .QLearningStagePredict(fitted.model = fitted.model,
+                                                          data.to.pred = counterfactual_data)
     
     cur_arm_name <- treatment.arm.df %>% slice(cur_index) %>%  pull(all_of(arm_var_name))
     
@@ -230,6 +244,22 @@ PercOracleQLearningOOS <- function(q.mod, oos.data){
   return(data_w_preds)
 }
 
+#' Helper function for predictions from a Q-learning stage model that accounts
+#' for differences in the calls for predict between LM/glmnet/RF
+#' @param fitted.model model you want predictions from
+#' @param data.to.pred matrix of covariate data as created by \code{.QLearningConstructCovariateMatrix}
+.QLearningStagePredict <- function(fitted.model, data.to.pred) {
+  fitted_model_type <- class(fitted.model)
+  
+  predictions <- switch(fitted_model_type,
+         lm = predict(fitted.model, newdata = as.data.frame(data.to.pred)),
+         cv.glmnet = glmnet:::predict.cv.glmnet(fitted.model, 
+                                                newx = as.matrix(data.to.pred[, -str_detect(colnames(data.to.pred), "(Intercept)")]), #For whatever reason glmnet doesn't want x to have an intercept column
+                                                s = "lambda.min"),
+         randomForest = randomForest:::predict.randomForest(fitted.model, newdata = data.to.pred))
+  
+  return(predictions)
+}
 
 ################################################################################
 ### Q-learning Mean Modeling Functions
@@ -247,6 +277,7 @@ PercOracleQLearningOOS <- function(q.mod, oos.data){
   # This way of calling lm preserves the covariate names
   lm_fit <- lm(data.list$y ~ . + 0, 
                data = as.data.frame(data.list$x),
+               model = FALSE,
                ...)
   
   return(lm_fit)

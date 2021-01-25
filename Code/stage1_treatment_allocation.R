@@ -34,4 +34,19 @@ allocationFn_stage1_v2 <- function(df, firstLineTreatments){
   return(out)
 }
 
-
+#' Stratified Permuted block randomization for stage one 
+#' @param df dataframe; each row contains a ppt
+#' @param firstLineTreatments character vector of the first line treatments
+#' @param strata.var.syms a vector with the variable names to stratify by. The 
+#' variable names should be symbols, not strings, for example sym("X_1") instead of "X_1"
+#' @return dataframe with the first line treatment appended (column name A1)
+StratifiedBlockRandomizationStage1 <- function(df, first.line.trts, 
+                                         strata.vars.syms = c(sym("X_1"))) {
+  data_w_trts <- df %>% group_by(!!!strata.vars.syms) %>% 
+    mutate(A1 = sample(rep(first.line.trts, 
+                             each = ceiling(n()/length(first.line.trts))),
+                         size = n())) %>% 
+    ungroup 
+  
+  return(data_w_trts)
+}

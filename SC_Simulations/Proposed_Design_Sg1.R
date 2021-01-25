@@ -6,7 +6,7 @@ library(future)
 library(furrr)
 library(here)
 
-#if (str_detect(here::here(), "jsperger") == TRUE) plan(multicore, workers = 8)
+#if (str_detect(here::here(), "jsperger") == TRUE) plan(multisession, workers = 8)
 plan(sequential)
 scripts <- str_subset(list.files(path = "../Code", full.names = TRUE), ".R$")
 quietly(map(scripts, source))
@@ -36,7 +36,7 @@ if (run_sim_flag == FALSE & is_null(read_sim_file_string) == TRUE) stop("read_si
 
 # Whether the simulated study data should be saved (to an .Rds)
 save_sim_data_flag <- FALSE
-save_sim_file_string <- paste0("../SimRuns/best_guess_no_subgroups_seed",seed_to_use, ".RDS")
+save_sim_file_string <- paste0("../SimRuns/best_guess_sg1_seed",seed_to_use, ".RDS")
 
 if (save_sim_data_flag == TRUE & is_null(save_sim_file_string)) stop("Must specify save_sim_file_string if save_sim_data_flag is TRUE")
 
@@ -64,11 +64,11 @@ read_analysis_file_string <- NULL
 
 if (run_analysis_flag == TRUE & is_null(read_analysis_file_string) == FALSE) stop("run_analysis_flag must be FALSE if read_analysis_file_string is specified")
 
-save_analysis_flag <- FALSE
-save_analysis_file_string <-  "../SimRuns/performance_best_guess_no_subgroups.RDS"
+save_analysis_flag <- TRUE
+save_analysis_file_string <-  "../SimRuns/performance_best_guess_sg1.RDS"
 
 # Create L data sets per setting
-L <- 1000
+L <- 5
 
 ##------------------------------------------------------------------------------
 ## Settings: Simulated Study Data Generation
@@ -76,13 +76,14 @@ L <- 1000
 metadata <- list(N = 1000,
                  firstLineTreatments = as.character(0:3),
                  secondLineTreatments = as.character(0:3),
-                 augmentationTreatments = as.character(4:6),
+                 augmentationTreatments = as.character(4:9),
                  standardOfCareTreatment = "0")
 
 impermissible_arm_seqs <- bind_rows(expand_grid(A1 = c("1", "2", "3"), A2 = "0"),
-                                    expand_grid(A1 = "0", A2 = c("4", "5", "6")),
-                                    tibble(A1 = c("1", "2", "3"), 
-                                           A2 = c("6", "5", "4")))
+                                    expand_grid(A1 = "0", A2 = c(as.character(1:6))),
+                                    expand_grid(A1 = "1", A2 = c("6", "8", "9")),
+                                    expand_grid(A1 = "2", A2 = c("5", "7", "9")),
+                                    expand_grid(A1 = "3", A2 = c("4", "7", "8")))
           
 metadata$possibleTreatmentSequences <- generatePossibleTreatmentSequencesGrid(
   first_line_trts = metadata$firstLineTreatments,
@@ -102,29 +103,21 @@ stage2_param_vec <- stage2_param_df$Coefficient
 names(stage2_param_vec) <- stage2_param_df$Parameter
 
 
-#W_1 is being used as a random intercept
-
 stage1_args <- list( stage.suffix = 1,
-                     treatment.arm.df = stage_1_trts <- tibble(A1 = as.character(0:3),
-                                                               A1_1 = c(0, 1, 0, 0),
-                                                               A1_2 = c(0, 0, 1, 0),
-                                                               A1_3 = c(0, 0, 0, 1)),
+                     treatment.arm.df = read_csv("./stage1_design_matrix.csv", col_types = "ciiii"),
                      arm.var.name = "A1",
-                     true.model.formula = formula(~ 1 + W_1 + A1_1 + A1_2 + A1_3 + A1_2:X_1), 
+                     true.model.formula = formula(~ -1 + A1_0 + A1_1 + A1_2 + A1_3 + A1_2:X_1), 
                      true.param.vec = stage1_param_vec,
-                     sigma.noise = sqrt(.5),
+                     sigma.noise = 1,
                      include.trt.indicators = TRUE,
                      include.mu = FALSE)
 
 stage2_args <- list(stage.suffix = 2,
-                    treatment.arm.df = tibble(A2 = as.character(0:6),
-                                              A2_1 = c(0, 1, 0, 0, 1, 1, 0),
-                                              A2_2 = c(0, 0, 1, 0, 1, 0, 1),
-                                              A2_3 = c(0, 0, 0, 1, 0, 1, 1)),
+                    treatment.arm.df = read_csv("./stage2_design_matrix.csv", col_types = "ciiii"),
                     arm.var.name = "A2",
-                    true.model.formula = formula(~ 1 + W_1 + A2_1 + A2_2 + A2_3 + A2_1:A2_2 + A2_1:A2_3 + A2_2:A2_3 + A2_2:X_1), 
+                    true.model.formula = formula(~ -1 + A2_0 + A2_1 + A2_2 + A2_3 + A2_1:A2_2 + A2_1:A2_3 + A2_2:A2_3 + A2_2:X_1), 
                     true.param.vec = stage2_param_vec,
-                    sigma.noise = sqrt(.5),
+                    sigma.noise = 1,
                     include.trt.indicators = TRUE,
                     include.mu = FALSE)
 
@@ -195,8 +188,8 @@ oos_args <- list(
 ##------------------------------------------------------------------------------
 
 analysis_args <- list(AnalysisModeling_fn = "QLearning",
-                      AnalysisModeling_args = list(stage1.formula = formula(PseudoY ~ 1 + A1_1 + A1_2 + A1_3 + A1_2:X_1),
-                                                   stage2.formula = formula(Y ~ 1 + I(A1_1 + A2_1) + I(A1_2 + A2_2) + I(A1_3 + A2_3) + 
+                      AnalysisModeling_args = list(stage1.formula = formula(PseudoY ~ -1 + A1_0 + A1_1 + A1_2 + A1_3 + A1_2:X_1),
+                                                   stage2.formula = formula(Y ~ -1 + I(A1_0 + A2_0) + I(A1_1 + A2_1) + I(A1_2 + A2_2) + I(A1_3 + A2_3) + 
                                                                               I(A1_2 + A2_2):X_1 + 
                                                                               A2_1:A2_2 + A2_1:A2_3 + A2_2:A2_3),
                                                    stage1.arm.map = args$generateY1_args$treatment.arm.df,
@@ -215,24 +208,7 @@ analysis_args <- list(AnalysisModeling_fn = "QLearning",
 ##
 ################################################################################
 
-##------------------------------------------------------------------------------
-## Single study example for debugging
-##------------------------------------------------------------------------------
 
-if (FALSE) {
-  s1 <- makeSimDataWrapper(metadata = metadata, args = args, 1) %>% 
-    mutate(Trt1 = A1_1 + A2_1, 
-           Trt2 = A1_2 + A2_2, 
-           Trt3 = A1_3 + A2_3)
-  
-  m1 <- lm(Y ~ 1 +  A1_1 + A1_2 + A1_3 + A2_1 + A2_2 + A2_3 + A2_1:A2_2 + A2_1:A2_3 + A2_2:A2_3 + A1_2:X_1 + A2_2:X_1, data = s1)
-  m1.simp <- lm(Y ~ Trt1 + Trt2 + Trt3 + A2_1:A2_2 + A2_1:A2_3 + A2_2:A2_3 + Trt2:X_1, data = s1)
-  m1.2 <- lm(Y2 ~ 1 + A2_1 + A2_2 + A2_3 + A2_1:A2_2 + A2_1:A2_3 + A2_2:A2_3 + A2_2:X_1, data = s1)
-  m1.1 <- lm(Y1 ~ 1 + A1_1 + A1_2 + A1_3 + A1_2:X_1 , data = s1)
-  
-  q1 <- exec(analysis_args$AnalysisModeling_fn, indf = s1, !!!analysis_args$AnalysisModeling_args)
-  
-}
 ##------------------------------------------------------------------------------
 ## Data Generation: Out-of-sample data
 ##------------------------------------------------------------------------------
@@ -249,6 +225,15 @@ if (gen_oos_flag == TRUE) {
     mutate(`A1_2:X_1` = A1_2*X_1,
            `A2_2:X_1` = A2_2*X_1)
   toc()
+  
+  if (FALSE) {
+    ptidx1_pos <- oosData %>% filter(X_1 == 1) %>% slice(1) %>% pull(ptid)
+    ptidx1_neg <- oosData %>% filter(X_1 == -1) %>% slice(1) %>% pull(ptid)
+    
+    oosData %>% filter(ptid == ptidx1_pos) %>% select(A1, A2, Mu, DeltaMu) %>% arrange(Mu) %>% as.data.frame
+    oosData %>% filter(ptid == ptidx1_neg) %>% select(A1, A2, Mu, DeltaMu) %>% arrange(Mu) %>% as.data.frame  
+  }
+  
 }
 
 if (is_null(read_oos_file_string) == FALSE) oosData <- readRDS(read_oos_file_string)
@@ -272,8 +257,6 @@ if (run_sim_flag == TRUE){
 if (save_sim_data_flag == TRUE) saveRDS(sim_data_list, save_sim_file_string)
 
 if (run_analysis_flag == TRUE) {
-  if (FALSE) {
-    
   
   print("Q-learning")
   tic()
@@ -286,15 +269,17 @@ if (run_analysis_flag == TRUE) {
   tic()
   
   ### Warning - hard coding here
-  # TODO - Remove hard coding
+  # TODO - Remove hard coding of N
   oracle_summary <- map(q_mods_list, 
-                        ~map_dfr(.x = ., ~PercOracleQLearningOOS(q.mod = ., oos.data = oosData))) %>% 
+                        ~map_dfr(.x = ., ~PercOracleQLearningOOS(q.mod = ., oos.data = oosData,
+                                                                 stage1.formula = update(analysis_args$AnalysisModeling_args$stage1.formula, 1 ~ .),
+                                                                 stage2.formula = update(analysis_args$AnalysisModeling_args$stage2.formula,1 ~ .)))) %>% 
     bind_rows(., .id = "Scenario") %>% 
     left_join(., y = tibble(Scenario = as.character(1:3), N = c(800, 1000, 1200)), by = "Scenario")
   
   
   toc()
-  }
+  
 
   
   print("Hypothesis testing")
@@ -311,9 +296,9 @@ if (run_analysis_flag == TRUE) {
   
   toc()
   
- #analysis_results <- list(oracle_summary, stage1_power_results_sc1)
+ analysis_results <- list(oracle_summary, stage1_power_results_sc1)
   
-  # 
+  
 } 
 
 if (is_null(read_analysis_file_string) == FALSE) analysis_results <- readRDS(read_analysis_file_string)
@@ -327,6 +312,26 @@ plan(sequential)
 ## Scratch work
 ##------------------------------------------------------------------------------
 
+##------------------------------------------------------------------------------
+## Single study example for debugging
+##------------------------------------------------------------------------------
+
+if (FALSE) {
+  s1 <- makeSimDataWrapper(metadata = metadata, args = args, 1) %>% 
+    mutate(Trt0 = A1_0 + A2_0,
+           Trt1 = A1_1 + A2_1, 
+           Trt2 = A1_2 + A2_2, 
+           Trt3 = A1_3 + A2_3)
+  
+  m1 <- lm(Y ~ 1 +  A1_1 + A1_2 + A1_3 + A2_1 + A2_2 + A2_3 + A2_1:A2_2 + A2_1:A2_3 + A2_2:A2_3 + A1_2:X_1 + A2_2:X_1, data = s1)
+  m1.simp <- lm(Y ~ Trt1 + Trt2 + Trt3 + A2_1:A2_2 + A2_1:A2_3 + A2_2:A2_3 + Trt2:X_1, data = s1)
+  m1.2 <- lm(Y2 ~ 1 + A2_1 + A2_2 + A2_3 + A2_1:A2_2 + A2_1:A2_3 + A2_2:A2_3 + A2_2:X_1, data = s1)
+  m1.1 <- lm(Y1 ~ 1 + A1_1 + A1_2 + A1_3 + A1_2:X_1 , data = s1)
+  m1.1.0 <- lm(Y1 ~ -1 + A1_0 + A1_1 + A1_2 + A1_3 + A1_2:X_1 , data = s1)
+  
+  q1 <- exec(analysis_args$AnalysisModeling_fn, indf = s1, !!!analysis_args$AnalysisModeling_args)
+  
+}
 
 if (FALSE){ 
   
