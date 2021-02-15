@@ -7,7 +7,7 @@ library(here)
 
 if (str_detect(here::here(), "jsperger") == TRUE) plan(multicore, workers = 8)
 
-scripts <- str_subset(list.files(path = "../Code", full.names = TRUE), ".R$")
+scripts <- str_subset(list.files(path = "../Code", full.names = TRUE, recursive = TRUE), ".R$")
 quietly(map(scripts, source))
 
 

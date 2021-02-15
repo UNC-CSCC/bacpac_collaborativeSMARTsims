@@ -8,7 +8,7 @@ library(here)
 
 #if (str_detect(here::here(), "jsperger") == TRUE) plan(multisession, workers = 8)
 plan(sequential)
-scripts <- str_subset(list.files(path = "../Code", full.names = TRUE), ".R$")
+scripts <- str_subset(list.files(path = "../Code", full.names = TRUE, recursive = TRUE), ".R$")
 quietly(map(scripts, source))
 
 
