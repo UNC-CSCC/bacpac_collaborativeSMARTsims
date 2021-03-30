@@ -21,8 +21,7 @@ quietly(map(scripts, source))
 ##------------------------------------------------------------------------------
 ## Settings: Simulation Run meta-settings
 ##------------------------------------------------------------------------------
-# Seed is from the NC Pick 4 Daytime Draw Sunday, Jan 24  https://nclottery.com/Pick4
-seed_to_use <- 8632
+seed_to_use <- 808
 set.seed(seed_to_use)
 
 
@@ -68,23 +67,22 @@ save_analysis_flag <- FALSE
 save_analysis_file_string <-  "../SimRuns/performance_best_guess_sg1.RDS"
 
 # Create L data sets per setting
-L <- 1000
+L <- 2
 
 ##------------------------------------------------------------------------------
 ## Settings: Simulated Study Data Generation
 ##------------------------------------------------------------------------------
 metadata <- list(N = 1000,
-                 firstLineTreatments = as.character(0:3),
-                 secondLineTreatments = as.character(0:3),
-                 augmentationTreatments = as.character(4:9),
+                 firstLineTreatments = as.character(0:2),
+                 secondLineTreatments = as.character(0:2),
+                 augmentationTreatments = as.character(3:5),
                  standardOfCareTreatment = "0")
 
-impermissible_arm_seqs <- bind_rows(expand_grid(A1 = c("1", "2", "3"), A2 = "0"),
-                                    expand_grid(A1 = "0", A2 = c(as.character(1:6))),
-                                    expand_grid(A1 = "1", A2 = c("6", "8", "9")),
-                                    expand_grid(A1 = "2", A2 = c("5", "7", "9")),
-                                    expand_grid(A1 = "3", A2 = c("4", "7", "8")))
-          
+impermissible_arm_seqs <- bind_rows(expand_grid(A1 = c("1", "2"), A2 = "0"),
+                                    expand_grid(A1 = "0", A2 = c(as.character(1:3))),
+                                    expand_grid(A1 = "1", A2 = c("5")),
+                                    expand_grid(A1 = "2", A2 = c("4")))
+
 metadata$possibleTreatmentSequences <- generatePossibleTreatmentSequencesGrid(
   first_line_trts = metadata$firstLineTreatments,
   second_line_trts = metadata$secondLineTreatments,
@@ -92,30 +90,30 @@ metadata$possibleTreatmentSequences <- generatePossibleTreatmentSequencesGrid(
   impermissible_trt_pairs_df = impermissible_arm_seqs)
 
 # Read in parameter vectors from CSVs
-stage1_param_df <- read.csv("./ParameterCSVs/SubgroupSc1-ATEscenario1/sg1_stage1.csv")
+stage1_param_df <- read.csv("./ParameterCSVs/ThreeTrts-SgSc1-ATESc1/sg1_stage1.csv")
 
 stage1_param_vec <- stage1_param_df$Coefficient
 names(stage1_param_vec) <- stage1_param_df$Parameter
 
-stage2_param_df <- read.csv("./ParameterCSVs/SubgroupSc1-ATEscenario1/sg1_stage2.csv")
+stage2_param_df <- read.csv("./ParameterCSVs/ThreeTrts-SgSc1-ATESc1/sg1_stage2.csv")
 
 stage2_param_vec <- stage2_param_df$Coefficient
 names(stage2_param_vec) <- stage2_param_df$Parameter
 
 
 stage1_args <- list( stage.suffix = 1,
-                     treatment.arm.df = read_csv("./stage1_design_matrix.csv", col_types = "ciiii"),
+                     treatment.arm.df = read_csv("./DesignMatrices/ThreeArm/three_trt_stage1_design_matrix.csv", col_types = "ciii"),
                      arm.var.name = "A1",
-                     true.model.formula = formula(~ -1 + A1_0 + A1_1 + A1_2 + A1_3 + A1_2:X_1), 
+                     true.model.formula = formula(~ -1 + X_3 + A1_0 + A1_1 + A1_2 + A1_1:X_1 + A1_0:X_2), 
                      true.param.vec = stage1_param_vec,
                      sigma.noise = 1,
                      include.trt.indicators = TRUE,
                      include.mu = FALSE)
 
 stage2_args <- list(stage.suffix = 2,
-                    treatment.arm.df = read_csv("./stage2_design_matrix.csv", col_types = "ciiii"),
+                    treatment.arm.df = read_csv("./DesignMatrices/ThreeArm/three_trt_stage2_design_matrix.csv", col_types = "ciii"),
                     arm.var.name = "A2",
-                    true.model.formula = formula(~ -1 + A2_0 + A2_1 + A2_2 + A2_3 + A2_1:A2_2 + A2_1:A2_3 + A2_2:A2_3 + A2_2:X_1), 
+                    true.model.formula = formula(~ -1 + X_3 + A2_0 + A2_1 + A2_2 + A2_1:X_1 + A2_0:A2_1 + A2_0:A2_2 + A2_1:A2_2 + A2_0:X_2), 
                     true.param.vec = stage2_param_vec,
                     sigma.noise = 1,
                     include.trt.indicators = TRUE,
@@ -125,7 +123,7 @@ args <- list(
   makePpts_fn = "makePpts",
   makePpts_args = list(metadata[["N"]]),
   makeCovariates_fn = "covariateFn_v1",
-  makeCovariates_args = list(numBinaryCovars = 3, props = c(0.5, 0.2, 0.4),
+  makeCovariates_args = list(numBinaryCovars = 3, props = c(0.5, 0.4, 0.9),
                              numNormalCovars = 1, mu = 0, sd = sqrt(.5)),
   allocateStage1Treatments_fn = "StratifiedBlockRandomizationStage1",
   allocateStage1Treatments_args = list(first.line.trts = metadata$firstLineTreatments,
@@ -149,11 +147,13 @@ args <- list(
 ## Settings: Scenario Modifications
 ##------------------------------------------------------------------------------
 
-metadata_settings_scenario1 <- map(c(800, 1000, 1200), ~list_modify(metadata, N = .))
+n_settings <- c(350, 550)
+
+metadata_settings_scenario1 <- map(n_settings, ~list_modify(metadata, N = .))
 
 metadata_list <- c(metadata_settings_scenario1)
 
-args_list_scenario1 <- map(c(800, 1000, 1200), ~list_modify(args, makePpts_args = list(.)))
+args_list_scenario1 <- map(n_settings, ~list_modify(args, makePpts_args = list(.)))
 
 args_list <- c(args_list_scenario1)
 
@@ -188,10 +188,9 @@ oos_args <- list(
 ##------------------------------------------------------------------------------
 
 analysis_args <- list(AnalysisModeling_fn = "QLearning",
-                      AnalysisModeling_args = list(stage1.formula = formula(PseudoY ~ -1 + A1_0 + A1_1 + A1_2 + A1_3 + A1_2:X_1),
-                                                   stage2.formula = formula(Y ~ -1 + I(A1_0 + A2_0) + I(A1_1 + A2_1) + I(A1_2 + A2_2) + I(A1_3 + A2_3) + 
-                                                                              I(A1_2 + A2_2):X_1 + 
-                                                                              A2_1:A2_2 + A2_1:A2_3 + A2_2:A2_3),
+                      AnalysisModeling_args = list(stage1.formula = formula(PseudoY ~ -1 + X_3 + A1_0 + A1_1 + A1_2 + A1_1:X_1 + A1_0:X_2),
+                                                   stage2.formula = formula(Y ~ -1 + X_3 + I(A1_0 + A2_0) + I(A1_1 + A2_1) + I(A1_2 + A2_2) + 
+                                                                              I(A1_1 + A2_1):X_1 + I(A1_0 + A2_0):X_2),
                                                    stage1.arm.map = args$generateY1_args$treatment.arm.df,
                                                    stage2.arm.map = args$generateY2_args$treatment.arm.df,
                                                    model.type = "lm",
@@ -223,16 +222,15 @@ if (gen_oos_flag == TRUE) {
     left_join(., args$generateY1_args$treatment.arm.df, by = "A1") %>% 
     left_join(., args$generateY2_args$treatment.arm.df, by = "A2") %>% 
     mutate(`A1_2:X_1` = A1_2*X_1,
-           `A2_2:X_1` = A2_2*X_1)
+           `A2_2:X_1` = A2_2*X_1,
+           `A1_2:X_2` = A1_2*X_2,
+           `A2_2:X_2` = A2_2*X_2,
+           `A1_1:X_1` = A1_1*X_1,
+           `A2_1:X_1` = A2_1*X_1,
+           `A1_1:X_2` = A1_1*X_2,
+           `A2_1:X_2` = A2_1*X_2,
+           `A2_1:A2_2` = A2_1*A2_2)
   toc()
-  
-  if (FALSE) {
-    ptidx1_pos <- oosData %>% filter(X_1 == 1) %>% slice(1) %>% pull(ptid)
-    ptidx1_neg <- oosData %>% filter(X_1 == -1) %>% slice(1) %>% pull(ptid)
-    
-    oosData %>% filter(ptid == ptidx1_pos) %>% select(A1, A2, Mu, DeltaMu) %>% arrange(Mu) %>% as.data.frame
-    oosData %>% filter(ptid == ptidx1_neg) %>% select(A1, A2, Mu, DeltaMu) %>% arrange(Mu) %>% as.data.frame  
-  }
   
 }
 
@@ -262,8 +260,8 @@ if (run_analysis_flag == TRUE) {
   tic()
   q_mods_list <-   map(sim_data_list, 
                        ~furrr::future_map(.x = .,
-                                     ~exec(analysis_args$AnalysisModeling_fn, indf = ., !!!analysis_args$AnalysisModeling_args),
-                                     .options = furrr::furrr_options(seed = TRUE)))
+                                          ~exec(analysis_args$AnalysisModeling_fn, indf = ., !!!analysis_args$AnalysisModeling_args),
+                                          .options = furrr::furrr_options(seed = TRUE)))
   toc()
   
   tic()
@@ -273,40 +271,38 @@ if (run_analysis_flag == TRUE) {
   #fitted_model_type <- class(q.mod$Stage1Mod)
   stage1_data <- .QLearningConstructCovariateMatrix(in.formula = update(analysis_args$AnalysisModeling_args$stage1.formula, 1 ~ .),
                                                     in.data = oosData, 
-                                                    create.intercept = FALSE)
+                                                    create.intercept = TRUE)
   
   stage2_data <- .QLearningConstructCovariateMatrix(in.formula = update(analysis_args$AnalysisModeling_args$stage2.formula, 1 ~ .),
                                                     in.data = oosData, 
-                                                    create.intercept = FALSE)
-  ### Warning - hard coding here
-  # TODO - Remove hard coding of N
+                                                    create.intercept = TRUE)
   oracle_summary <- map(q_mods_list, 
                         ~map_dfr(.x = ., ~PercOracleQLearningOOS(q.mod = ., oos.data = oosData,
                                                                  stage1.data = stage1_data,
                                                                  stage2.data = stage2_data))) %>% 
     bind_rows(., .id = "Scenario") %>% 
-    left_join(., y = tibble(Scenario = as.character(1:3), N = c(800, 1000, 1200)), by = "Scenario")
+    left_join(., y = tibble(Scenario = as.character(1:length(n_settings)), N = n_settings), by = "Scenario")
   
   
   toc()
   
-
+  
   
   print("Hypothesis testing")
-
-
+  
+  
   tic()
   stage1_power_results_sc1 <- map(sim_data_list[1:length(metadata_settings_scenario1)],
                                   ~map_dfr(.x = ., ~CalcStage1WaldUnadjustedPvals(study.data = .,
                                                                                   resp.formula = formula(Y1 ~ A1),
-                                                                                  coefs.to.test = c("A11", "A12", "A13")))) %>% 
+                                                                                  coefs.to.test = c("A11", "A12")))) %>% 
     map(., ~AdjustPvals(., adj.method = "BH"))
   
   stage1_pval_summary <- map_dfr(stage1_power_results_sc1, ~colMeans(. < .05))
   
   toc()
   
- analysis_results <- list(oracle_summary, stage1_power_results_sc1)
+  analysis_results <- list(oracle_summary, stage1_power_results_sc1)
   
   
 } 
@@ -316,69 +312,3 @@ if (is_null(read_analysis_file_string) == FALSE) analysis_results <- readRDS(rea
 if (save_analysis_flag == TRUE) saveRDS(analysis_results, save_analysis_file_string)
 
 plan(sequential)
-
-
-##------------------------------------------------------------------------------
-## Scratch work
-##------------------------------------------------------------------------------
-
-##------------------------------------------------------------------------------
-## Single study example for debugging
-##------------------------------------------------------------------------------
-
-if (FALSE) {
-  s1 <- makeSimDataWrapper(metadata = metadata, args = args, 1) %>% 
-    mutate(Trt0 = A1_0 + A2_0,
-           Trt1 = A1_1 + A2_1, 
-           Trt2 = A1_2 + A2_2, 
-           Trt3 = A1_3 + A2_3)
-  
-  m1 <- lm(Y ~ 1 +  A1_1 + A1_2 + A1_3 + A2_1 + A2_2 + A2_3 + A2_1:A2_2 + A2_1:A2_3 + A2_2:A2_3 + A1_2:X_1 + A2_2:X_1, data = s1)
-  m1.simp <- lm(Y ~ Trt1 + Trt2 + Trt3 + A2_1:A2_2 + A2_1:A2_3 + A2_2:A2_3 + Trt2:X_1, data = s1)
-  m1.2 <- lm(Y2 ~ 1 + A2_1 + A2_2 + A2_3 + A2_1:A2_2 + A2_1:A2_3 + A2_2:A2_3 + A2_2:X_1, data = s1)
-  m1.1 <- lm(Y1 ~ 1 + A1_1 + A1_2 + A1_3 + A1_2:X_1 , data = s1)
-  m1.1.0 <- lm(Y1 ~ -1 + A1_0 + A1_1 + A1_2 + A1_3 + A1_2:X_1 , data = s1)
-  
-  q1 <- exec(analysis_args$AnalysisModeling_fn, indf = s1, !!!analysis_args$AnalysisModeling_args)
-  
-}
-
-if (FALSE){ 
-  
-  
-  oos_preds <- map(q_mods, ~PredictOptSeqQLearningOOS(q.mod = ., oos.data = oosData))
-  
-  stage1_wald <-map(sim_data_list[[3]], ~CalcStage1WaldUnadjustedPvals(study.data = .,
-                                                         resp.formula = formula(Y1 ~ A1_1 + A1_2 + A1_3),
-                                                         contrast.mat = diag(4)[-1,]))
-  
-  CalcStage1WaldUnadjustedPvals <- function(study.data,
-                                            resp.formula = formula(Y1 ~ A1*X_1),
-                                            contrast.mat = NULL,
-                                            coefs.to.test = NULL)
-  
-  oosData <- oosData %>% 
-    mutate(Q1pred = predict(q1$Stage1Mod, newdata = oosData),
-           Q2pred = predict(q1$Stage2Mod, newdata = oosData)) %>% 
-    select(-.groups)
-  
-  useful <- oosData %>% select(A1, A2, ptid, Mu, DeltaMu, Q1pred, Q2pred)
-  
-  dtr_assigned_trts <-useful %>% group_by(ptid) %>% summarise(A1Hat = A1[which.max(Q1pred)],
-                                                              A2Hat = A2[which.max(Q2pred)],
-                                                              MuAhat = Mu[which.max(Q1pred + Q2pred)],
-                                                              DeltaMuAhat = DeltaMu[which.max(Q1pred + Q2pred)],)
-  
-  rf_args <- list_modify(analysis_args, AnalysisModeling_args = list_modify(analysis_args$AnalysisModeling_args, model.type = "rf"))
-  
-  
-  rf_q_mods_list <-   map(sim_data_list, 
-                          ~furrr::future_map(.x = .,
-                                             ~exec(rf_args$AnalysisModeling_fn, indf = ., !!!rf_args$AnalysisModeling_args),
-                                             .options = furrr::furrr_options(seed = TRUE)))
-  
-  rf_oracle_summary <- map(rf_q_mods_list, 
-                        ~map_dfr(.x = ., ~PercOracleQLearningOOS(q.mod = ., oos.data = oosData))) %>% 
-    bind_rows(., .id = "Scenario") %>% 
-    left_join(., y = tibble(Scenario = as.character(1:3), N = c(800, 1000, 1200)), by = "Scenario")
-}
