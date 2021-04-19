@@ -38,6 +38,28 @@ covariateFn_v1 <- function(df, numBinaryCovars, props,
   return(out)
 }
 
+
+#' Make covariate function that makes independing bernoulli and normal covars
+#'
+#' @param df dataframe; each row should correpsond to a ppt 
+#' @param numBinaryCovars integer; non-neg number of binary covariates to add
+#' @param props vector of probabilities of successes for each binary covariate
+#' @param numNormalCovars integer; non-neg number of normal covariates to add
+#' @param mu vector of means for the normal covariates
+#' @param sd vector of sds for the normal covariates
+#'
+#' @return dataframe; df with the covariates appended
+#' 
+#' @export
+covariateFn_Mvn <- function(df, numBinaryCovars, props,
+                            mu.vec, sigma.mat, d.partial.obs, prop.unobserved){
+  out <- df %>% 
+    makeBinaryCovars(numBinaryCovars, props) %>%
+    MakeMVNCovariates(mu.vec, sigma.mat, d.partial.obs, prop.unobserved)
+  
+  return(out)
+}
+
 #' Add binary covariates to the generated patients that take values in {-1, 1}
 #'
 #' @param df dataframe; at a minimum contains the same number of rows 
@@ -112,4 +134,52 @@ makeNormalCovariates <- function(df, numCovars, mu, sd){
     }
     return(df)
   }
+}
+
+
+#' Add multivariate normal covariates to the generated ppts
+#' Optionally have some of the covaraites be partially observed. 
+#' Creates indicators of whether the covariate was observed for the partially observed covariates
+#' @param df dataframe; at a minimum contains the same number of rows as
+#' participants 
+#' @param mu.vec vector; means of normal covariates
+#' @param sd sigma.mat; sds of normal covariates
+#'
+#' @return dataframe; df with the normal covariates appended. 
+#' W_x for continuous covariates
+#' U_x for partially observed covariates
+#' O_x for indicator of whether the subject had expensive covariates measured
+MakeMVNCovariates <- function(df, mu.vec, sigma.mat, d.partial.obs = 0, prop.unobserved){
+  if (is.null(mu.vec)) return(df)
+  
+  cont_covar <- mvtnorm::rmvnorm(n = nrow(df), mean = mu.vec, sigma = sigma.mat)
+  
+  if (d.partial.obs > 0){
+    d.observed <- ncol(cont_covar) - d.partial.obs
+    d.true.params <- ncol(cont_covar)
+    
+    # Want to keep the partially observed variables for data generation
+    obs_var_names <- paste0("W_", 1:length(mu.vec))
+    partial_var_names <- paste0("U_", 1:d.partial.obs)
+    obs_indicator_var_names <- paste0("O_", 1:d.partial.obs)
+    
+    start_pos_partial_covar <- min(d.true.params, d.true.params - d.partial.obs + 1)
+    
+    partial_covar <- matrix(cont_covar[, start_pos_partial_covar:d.true.params], ncol = d.partial.obs)
+    partial_covar[sample(1:nrow(partial_covar), 
+                         size = floor((prop.unobserved)*nrow(partial_covar))), ] <- NA
+
+    obs_indicators <- is.na(partial_covar) == FALSE
+      
+    cont_covar <- cbind(cont_covar, partial_covar, obs_indicators)
+    
+    
+    colnames(cont_covar) <- c(obs_var_names, partial_var_names, obs_indicator_var_names)
+    
+    
+  } else{ colnames(cont_covar) <- paste0("W_", 1:ncol(cont_covar))}
+  
+  df <- bind_cols(df, as_tibble(cont_covar))
+  
+  return(df)
 }

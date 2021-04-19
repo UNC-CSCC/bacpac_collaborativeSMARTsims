@@ -87,7 +87,7 @@ GenNormalOutcomeByFormula <- function(df,
                                        treatment.arm.map = treatment.arm.df,
                                        arm.var.name.set = arm.var.name)
   
-  full_model_X <- model.matrix(true.model.formula, data=study_data_w_inds)
+  full_model_X <- model.matrix(true.model.formula, data=study_data_w_inds, na.action = na.fail)
   
   unused_columns <- setdiff(colnames(full_model_X), names(true.param.vec))
   unused_params <- setdiff(names(true.param.vec), colnames(full_model_X))

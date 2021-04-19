@@ -161,14 +161,14 @@ analyzeSimulationRunsOneSettingWrapper <- function(metadata, args,
 
 #' Calculate percentage of oracle value
 #'
-#' @param metadata list of metadata (N, firstline, secondline, augementation, and SOC treatments)
+#' study.data.list
+#' @param oos.data
 #' @param args list of functions and arguments for each key trial design and simulation aspect
-#'
 #' @return long data frame for one out of sample data set 
 #' @export 
-analyzeSimulationRunsPercOracleWrapper <- function(metadata, args,
-                                                   study.data.list,
-                                                   oos.data){
+analyzeSimulationRunsPercOracleWrapper <- function(study.data.list,
+                                                   args,
+                                                   oos.data, ...){
   oos_unique <- oos.data %>% distinct_at(., .vars = "ptid", .keep_all = TRUE)
   
   oos_vals <- map(study.data.list, 
