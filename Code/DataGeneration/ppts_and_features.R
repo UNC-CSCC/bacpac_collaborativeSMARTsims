@@ -137,6 +137,10 @@ makeNormalCovariates <- function(df, numCovars, mu, sd){
 }
 
 
+# Make features/covariates ----------------------------------------------------
+# Partially-observed covariates -----------------------------------------------
+# -----------------------------------------------------------------------------
+
 #' Add multivariate normal covariates to the generated ppts
 #' Optionally have some of the covaraites be partially observed. 
 #' Creates indicators of whether the covariate was observed for the partially observed covariates
@@ -182,4 +186,129 @@ MakeMVNCovariates <- function(df, mu.vec, sigma.mat, d.partial.obs = 0, prop.uno
   df <- bind_cols(df, as_tibble(cont_covar))
   
   return(df)
+}
+
+
+# Make features/covariates ----------------------------------------------------
+# Cluster-correlated data generation-------------------------------------------
+# -----------------------------------------------------------------------------
+
+
+
+#' Make covariate function that make
+#'
+#' @param df dataframe; each row should correpsond to a ppt 
+#' @param n.sites number of sites
+#' @param numBinaryCovars integer; non-neg number of binary covariates to add
+#' @param props vector of probabilities of successes for each binary covariate
+#' @param numNormalCovars integer; non-neg number of normal covariates to add
+#' @param mu vector of means for the normal covariates
+#' @param sd vector of sds for the normal covariates
+#'
+#' @return dataframe; df with the covariates appended
+#' 
+#' @export
+covariateFn_Cluster <- function(df, n.sites, 
+                                bin.props, bin.iccs,
+                                mu.vec, overall.sd, normal.iccs, ...){
+  out <- df %>% 
+    MakeClusters(n.sites = n.sites) %>% 
+    MakeCorrelatedBinaryCovars(bin.props, bin.iccs, ...) %>%
+    MakeClusterCorrelatedNormalCovars(mu.vec, overall.sd, normal.iccs)
+  
+  return(out)
+}
+
+
+#' Create clusters (enrollment sites)
+#' @param df the current data frame
+#' @param n.sites the number of sites that will be enrolling patients (the number of clusters)
+#' 
+#' @return the input data frame with a column indicating site membership appended
+MakeClusters <- function(df, n.sites){
+  return(df %>% mutate(Site = sample(1:n.sites, size = n(), replace = TRUE)))
+}
+
+#' Create cluster-correlated binary covariates using the \code{fabricatr} package. 
+#' By default covariates use a {-1, 1} encoding
+#' @param df the current data frame
+#' @param bin.props vector of probs; probabilities (proportions) with binary
+#' covariate = 1
+#' @param bin.iccs vector of intra-cluster correlation coefficients the same length as bin.props, or a single constant that will be used for all covariates
+#' @param zero.one.encoding logical indicating whether {0,1} encoding should be used instead of the default {-1, 1} encoding. Defaults is FALSE
+#' 
+#' @return the input data frame with the covariates appended
+MakeCorrelatedBinaryCovars <- function(df, bin.props, bin.iccs, zero.one.coding = FALSE){
+  stopifnot("Site" %in% colnames(df))
+  
+  num_covars <- length(bin.props)
+  
+  if(num_covars == 0) return(df)
+  
+  # Recycle bin.iccs so its length matches num_covars
+  if(length(bin.iccs) < num_covars){
+    if(length(bin.iccs) > 1) warning("Length of bin.iccs and bin.props do not match, recycling bin.iccs. Bin.iccs is not a constant, verify this mismatch is intended")
+    bin.iccs <- rep(bin.iccs, length.out = num_covars)
+  }
+  
+  # Create covariates
+  bin_covar_mat <- matrix(nrow = nrow(df), ncol = num_covars)
+  
+  for(i in 1:num_covars){
+    bin_covar_mat[,i] <- fabricatr::draw_binary_icc(prob = bin.props[i],
+                                                    clusters = df$Site,
+                                                    ICC = bin.iccs[i])
+  }
+  
+  # Transform to {-1, 1} coding unless zero.one.coding is specified
+  if(zero.one.coding == FALSE) bin_covar_mat <- 2*bin_covar_mat - 1
+  
+  # Naming
+  covar_names <- paste("X", 1:num_covars, sep = "_")
+  colnames(bin_covar_mat) <- covar_names
+  
+  df_with_bin_covars <- bind_cols(df, as_tibble(bin_covar_mat))
+  
+  return(df_with_bin_covars)
+}
+
+
+#' Create cluster-correlated binary covariates using the \code{fabricatr} package. 
+#' By default covariates use a {-1, 1} encoding
+#' @param df the current data frame
+#' @param mu.vec vector of means. The length of this vector determines the number of normal covariates to generate
+#' @param overall.sd the standard deviation for each covariate. The within and between cluster variance is derived from this and the ICC 
+#' @param normal.iccs vector of intra-class correlation coefficients
+#' 
+#' @return the input data frame with the covariates appended
+MakeClusterCorrelatedNormalCovars <- function(df, mu.vec, overall.sd, normal.iccs){
+  stopifnot("Site" %in% colnames(df))
+  
+  num_covars <- length(mu.vec)
+  
+  if(num_covars == 0) return(df)
+  
+  # Recycle normal.iccs so its length matches num_covars
+  if(length(normal.iccs) < num_covars){
+    if(length(normal.iccs) > 1) warning("Length of bin.iccs and bin.props do not match, recycling bin.iccs. Bin.iccs is not a constant, verify this mismatch is intended")
+    normal.iccs <- rep(normal.iccs, length.out = num_covars)
+  }
+  
+  # Create covariates
+  norm_covar_mat <- matrix(nrow = nrow(df), ncol = num_covars)
+  
+  for(i in 1:num_covars){
+    norm_covar_mat[,i] <- fabricatr::draw_normal_icc(mean = mu.vec[i],
+                                                     clusters = df$Site,
+                                                     ICC = normal.iccs[i],
+                                                     total_sd = overall.sd)
+  }
+  
+  # Naming
+  covar_names <- paste("W", 1:num_covars, sep = "_")
+  colnames(norm_covar_mat) <- covar_names
+  
+  df_with_norm_covars <- bind_cols(df, as_tibble(norm_covar_mat))
+  
+  return(df_with_norm_covars)
 }
