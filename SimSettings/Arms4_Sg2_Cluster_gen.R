@@ -43,7 +43,7 @@ if (save_sim_data_flag == TRUE & is_null(save_sim_file_string)) stop("Must speci
 # Whether to generate out-of-sample data 
 # If read_sim_file_string is specified, it will try to read in an .Rds of existing out-of-sample
 # simulated data from read_oos_file_string
-gen_oos_flag <- TRUE
+gen_oos_flag <- FALSE
 
 read_oos_file_string <- NULL
 
@@ -68,7 +68,7 @@ save_analysis_flag <- FALSE
 save_analysis_file_string <-  "../SimRuns/performance_best_guess_sg2.RDS"
 
 # Create L data sets per setting
-L <- 5
+L <- 1000
 
 ##------------------------------------------------------------------------------
 ## Settings: Simulated Study Data Generation
@@ -128,14 +128,14 @@ args <- list(
   makePpts_args = list(metadata[["N"]]),
   makeCovariates_fn = "covariateFn_Cluster",
   makeCovariates_args = list(n.sites = 8, 
-                             bin.props = c(.3, .4, .5), 
-                             bin.iccs = c(.05, .05, .1),
+                             bin.props = c(.3, .4, .5, .9, .25, .2), 
+                             bin.iccs = c(.05, .05, .1, .03, .1, .05),
                              mu.vec = c(0, 0), 
                              overall.sd = 1, 
                              normal.iccs = c(.05, .05)),
-  allocateStage1Treatments_fn = "StratifiedBlockRandomizationStage1",
-  allocateStage1Treatments_args = list(first.line.trts = metadata$firstLineTreatments,
-                                       strata.vars.syms = c(sym("X_1"), sym("X_2"))),
+  allocateStage1Treatments_fn = "AllocateStage1TrtMinCluster",
+  allocateStage1Treatments_args = list(firstLineTreatments = metadata$firstLineTreatments,
+                                       covar.names.to.min = paste0("X_", 1:6)),
   generateY1_fn = "GenNormalOutcomeByFormula",
   generateY1_args = stage1_args,
   assignResponderStatus_fn = "assignResponderStatusByQuantile",
@@ -156,7 +156,7 @@ args <- list(
 ##------------------------------------------------------------------------------
 
 
-n_settings <- c(600, 725)
+n_settings <- c(600)
 
 metadata_settings_scenario1 <- map(n_settings, ~list_modify(metadata, N = .))
 
@@ -257,63 +257,37 @@ if (run_sim_flag == TRUE){
 
 if (save_sim_data_flag == TRUE) saveRDS(sim_data_list, save_sim_file_string)
 
-if (run_analysis_flag == TRUE) {
-  
-  print("Q-learning")
-  tic()
-  q_mods_list <-   map(sim_data_list, 
-                       ~furrr::future_map(.x = .,
-                                          ~exec(analysis_args$AnalysisModeling_fn, indf = ., !!!analysis_args$AnalysisModeling_args),
-                                          .options = furrr::furrr_options(seed = TRUE)))
-  toc()
-  
-  tic()
-  
-  
-  
-  #fitted_model_type <- class(q.mod$Stage1Mod)
-  stage1_data <- .QLearningConstructCovariateMatrix(in.formula = update(analysis_args$AnalysisModeling_args$stage1.formula, 1 ~ .),
-                                                    in.data = oosData, 
-                                                    create.intercept = FALSE)
-  
-  stage2_data <- .QLearningConstructCovariateMatrix(in.formula = update(analysis_args$AnalysisModeling_args$stage2.formula, 1 ~ .),
-                                                    in.data = oosData, 
-                                                    create.intercept = FALSE)
-  ### Warning - hard coding here
-  # TODO - Remove hard coding of N
-  oracle_summary <- map(q_mods_list, 
-                        ~map_dfr(.x = ., ~PercOracleQLearningOOS(q.mod = ., oos.data = oosData,
-                                                                 stage1.data = stage1_data,
-                                                                 stage2.data = stage2_data))) %>% 
-    bind_rows(., .id = "Scenario") %>% 
-    left_join(., y = tibble(Scenario = as.character(1:length(n_settings)), N = n_settings), by = "Scenario")
-  
-  
-  toc()
-  
-  
-  
-  print("Hypothesis testing")
-  
-  
-  tic()
-  stage1_power_results_sc1 <- map(sim_data_list[1:length(metadata_settings_scenario1)],
-                                  ~map_dfr(.x = ., ~CalcStage1WaldUnadjustedPvals(study.data = .,
-                                                                                  resp.formula = formula(Y1 ~ A1),
-                                                                                  coefs.to.test = c("A11", "A12", "A13")))) %>% 
-    map(., ~AdjustPvals(., adj.method = "BH"))
-  
-  stage1_pval_summary <- map_dfr(stage1_power_results_sc1, ~colMeans(. < .05))
-  
-  toc()
-  
-  analysis_results <- list(oracle_summary, stage1_power_results_sc1)
-  
-  
-} 
 
-if (is_null(read_analysis_file_string) == FALSE) analysis_results <- readRDS(read_analysis_file_string)
+AnalyzeImbalances <- function(indf, vars.to.check){
+  imbalance_across_study <- vector("numeric", length = length(vars.to.check))
+  
+  ImbalanceHelper <- function(indf, cur.var){
+    allocation_table <- indf %>% group_by(!!sym(cur.var)) %>% group_map( .f = ~table(.$A1))
+    imbalance_by_level <- map_dbl(allocation_table, ~diff(range(.)))
+    
+    return(imbalance_by_level)
+  }
+  
+  
+  study_level_imbalances <- map(vars.to.check, ~ImbalanceHelper(indf, .)) %>% unlist
+  
+  cluster_level_imbalances <- indf %>%  group_by(Site) %>% 
+    group_map(., .f = function(x, ...) map(vars.to.check, ~ImbalanceHelper(indf = x, .) %>% unlist)) %>% 
+    unlist
+  
+  cluster_treatment_imbalances <- indf %>% group_by(Site) %>% 
+    group_map(., ~max(diff(range(table(.$A1))))) %>% 
+    unlist
+  
+  imbalance_summary <- c("MaxTreatmentImbalance" = max(diff(range(table(indf$A1)))),
+                         "MaxStudywideCovImbalance" = max(study_level_imbalances),
+                         "MaxSiteTreatmentImbalance" = max(cluster_treatment_imbalances),
+                         "MaxSiteCovImbalance" = max(cluster_level_imbalances))  
+  return(imbalance_summary)
+}
 
-if (save_analysis_flag == TRUE) saveRDS(analysis_results, save_analysis_file_string)
+imbalance_summary <- map(sim_data_list, ~map_dfr(., ~AnalyzeImbalances(indf = ., vars.to.check = paste0("X_", 1:3))))
+
+#write_csv(imbalance_summary[[1]], "imbalance_summary_5_covars.csv")
 
 plan(sequential)
