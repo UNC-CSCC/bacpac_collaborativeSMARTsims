@@ -259,6 +259,7 @@ calcTrueMeansAndPOs <- function(indf,
   mu_df <- mu_df %>% 
     group_by(ptid) %>% 
     mutate(maxMu = max(Mu),
+           minMu = min(Mu),
            OptA1 = A1[which.max(Mu)],
            OptA2 = A2[which.max(Mu)],
            OutcomeUnderOpt = PO[which.max(Mu)],

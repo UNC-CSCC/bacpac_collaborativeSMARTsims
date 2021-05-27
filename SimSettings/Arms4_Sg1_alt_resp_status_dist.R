@@ -68,7 +68,7 @@ save_analysis_flag <- FALSE
 save_analysis_file_string <-  "../SimRuns/performance_best_guess_sg1.RDS"
 
 # Create L data sets per setting
-L <- 2
+L <- 1000
 
 ##------------------------------------------------------------------------------
 ## Settings: Simulated Study Data Generation
@@ -106,7 +106,7 @@ names(stage2_param_vec) <- stage2_param_df$Parameter
 stage1_args <- list( stage.suffix = 1,
                      treatment.arm.df = read_csv("./DesignMatrices/FourArm/stage1_design_matrix.csv", col_types = "ciiii"),
                      arm.var.name = "A1",
-                     true.model.formula = formula(~ -1 + A1_0 + A1_1 + A1_2 + A1_3 + A1_2:X_1), 
+                     true.model.formula = formula(~ -1 + X_2 + X_3 +A1_0 + A1_1 + A1_2 + A1_3 + X_2 + X_3 + A1_3:X_1 + A1_2:X_1), 
                      true.param.vec = stage1_param_vec,
                      sigma.noise = 1,
                      include.trt.indicators = TRUE,
@@ -115,7 +115,7 @@ stage1_args <- list( stage.suffix = 1,
 stage2_args <- list(stage.suffix = 2,
                     treatment.arm.df = read_csv("./DesignMatrices/FourArm/stage2_design_matrix.csv", col_types = "ciiii"),
                     arm.var.name = "A2",
-                    true.model.formula = formula(~ -1 + A2_0 + A2_1 + A2_2 + A2_3 + A2_1:A2_2 + A2_1:A2_3 + A2_2:A2_3 + A2_2:X_1), 
+                    true.model.formula = formula(~ -1 + X_2 + X_3 + A2_0 + A2_1 + A2_2 + A2_3 + X_2 + X_3 + A2_1:A2_2 + A2_1:A2_3 + A2_2:A2_3 + A2_2:X_1 + A2_3:X_1 + A2_0:A2_1 + A2_0:A2_2 + A2_0:A2_3), 
                     true.param.vec = stage2_param_vec,
                     sigma.noise = 1,
                     include.trt.indicators = TRUE,
@@ -125,8 +125,8 @@ args <- list(
   makePpts_fn = "makePpts",
   makePpts_args = list(metadata[["N"]]),
   makeCovariates_fn = "covariateFn_v1",
-  makeCovariates_args = list(numBinaryCovars = 3, props = c(0.5, 0.2, 0.4),
-                             numNormalCovars = 1, mu = 0, sd = sqrt(.5)),
+  makeCovariates_args = list(numBinaryCovars = 5, props = c(0.5, 0.9, .7, .7, .6),
+                             numNormalCovars = 5, mu = c(0, 0, 0, 0, 0), sd = rep(sqrt(.5), 5)),
   allocateStage1Treatments_fn = "StratifiedBlockRandomizationStage1",
   allocateStage1Treatments_args = list(first.line.trts = metadata$firstLineTreatments,
                                        strata.vars.syms = c(sym("X_1"))),
@@ -134,7 +134,7 @@ args <- list(
   generateY1_args = stage1_args,
   assignResponderStatus_fn = "assignResponderStatusByQuantile",
   assignResponderStatus_args = list(ctsOutcome1 = "Y1", 
-                                    cutoffs = c(0.1, 0.5, .9),
+                                    cutoffs = c(0.25, 0.515, .875),
                                     status.labels = c("bad", "medium", "good", "excellent")),
   allocateStage2Treatments_fn = "allocationFn_stage2_trt_grid_4resps",
   allocateStage2Treatments_args = list(trt.options.grid = metadata$possibleTreatmentSequences,
@@ -149,7 +149,7 @@ args <- list(
 ## Settings: Scenario Modifications
 ##------------------------------------------------------------------------------
 
-n_settings <- c(500, 700, 1000)
+n_settings <- c(630)
 
 metadata_settings_scenario1 <- map(n_settings, ~list_modify(metadata, N = .))
 
@@ -180,8 +180,8 @@ oos_args <- list(
                                                     args$generateY2_fn,
                                                     args$assignResponderStatus_fn,
                                                     args$generateY_fn),
-                      outcome_args_list = list(args$generateY1_args,
-                                               args$generateY2_args,
+                      outcome_args_list = list(list_modify(args$generateY1_args, sigma.noise = 0),
+                                               list_modify(args$generateY2_args, sigma.noise = 0),
                                                args$assignResponderStatus_args,
                                                args$generateY_args)))
 
@@ -190,13 +190,24 @@ oos_args <- list(
 ##------------------------------------------------------------------------------
 
 analysis_args <- list(AnalysisModeling_fn = "QLearning",
-                      AnalysisModeling_args = list(stage1.formula = formula(PseudoY ~ -1 + A1_0 + A1_1 + A1_2 + A1_3 + A1_2:X_1),
-                                                   stage2.formula = formula(Y ~ -1 + I(A1_0 + A2_0) + I(A1_1 + A2_1) + I(A1_2 + A2_2) + I(A1_3 + A2_3) + 
-                                                                              I(A1_2 + A2_2):X_1 + 
+                      AnalysisModeling_args = list(stage1.formula = formula(PseudoY ~ -1 + A1_0 + A1_1 + A1_2 + A1_3 + X_2 + X_3 +
+                                                                              A1_2:X_1 + A1_2:X_2 + A1_2:X_3 + A1_2:X_4 + A1_2:X_5 +
+                                                                              A1_2:W_1 + A1_2:W_2 + A1_2:W_3 + A1_2:W_4 + A1_2:W_5 +
+                                                                              A1_3:X_1 + A1_3:X_2 +  A1_3:X_3 + A1_3:X_4 + A1_3:X_5 + 
+                                                                              A1_3:W_1 + A1_3:W_2 + A1_3:W_3 + A1_3:W_4 + A1_3:W_5 +
+                                                                              A1_1:X_1 + A1_1:X_2 + A1_1:X_3 + A1_1:X_4 + A1_1:X_5 +
+                                                                              A1_1:W_1 + A1_1:W_2 + A1_1:W_3 + A1_1:W_4 + A1_1:W_5),
+                                                   stage2.formula = formula(Y ~ -1 + I(A1_0 + A2_0) + I(A1_1 + A2_1) + I(A1_2 + A2_2) + I(A1_3 + A2_3) + X_2 + X_3 +
+                                                                              I(A1_2 + A2_2):X_1 + I(A1_2 + A2_2):X_2 + I(A1_2 + A2_2):X_3 + I(A1_2 + A2_2):X_4 + I(A1_2 + A2_2):X_5 +
+                                                                              I(A1_2 + A2_2):W_1 + I(A1_2 + A2_2):W_2 +  I(A1_2 + A2_2):W_3 + I(A1_2 + A2_2):W_4 + I(A1_2 + A2_2):W_5 + 
+                                                                              I(A1_1 + A2_1):X_1 + I(A1_1 + A2_1):X_2 +  I(A1_1 + A2_1):X_3 + I(A1_1 + A2_1):X_4 + I(A1_1 + A2_1):X_5 +
+                                                                              I(A1_1 + A2_1):W_1 + I(A1_1 + A2_1):W_2 + I(A1_1 + A2_1):W_3 + I(A1_1 + A2_1):W_4 + I(A1_1 + A2_1):W_5 + 
+                                                                              I(A1_3 + A2_3):X_1 + I(A1_3 + A2_3):X_2 + I(A1_3 + A2_3):X_3 + I(A1_3 + A2_3):X_4 + I(A1_3 + A2_3):X_5 +
+                                                                              I(A1_3 + A2_3):W_1 + I(A1_3 + A2_3):W_2 + I(A1_3 + A2_3):W_3 + I(A1_3 + A2_3):W_4 + I(A1_3 + A2_3):W_5 + 
                                                                               A2_1:A2_2 + A2_1:A2_3 + A2_2:A2_3),
                                                    stage1.arm.map = args$generateY1_args$treatment.arm.df,
                                                    stage2.arm.map = args$generateY2_args$treatment.arm.df,
-                                                   model.type = "lm",
+                                                   model.type = "lasso",
                                                    impermissible.arms.df = impermissible_arm_seqs),
                       PredictSequence_fn = "predictTreatSequence",
                       PredictSequence_args = NULL,
@@ -225,7 +236,9 @@ if (gen_oos_flag == TRUE) {
     left_join(., args$generateY1_args$treatment.arm.df, by = "A1") %>% 
     left_join(., args$generateY2_args$treatment.arm.df, by = "A2") %>% 
     mutate(`A1_2:X_1` = A1_2*X_1,
-           `A2_2:X_1` = A2_2*X_1)
+           `A2_2:X_1` = A2_2*X_1,
+           `A1_3:X_1` = A1_3*X_1,
+           `A2_3:X_1` = A2_3*X_1)
   toc()
   
 }
@@ -267,11 +280,11 @@ if (run_analysis_flag == TRUE) {
   #fitted_model_type <- class(q.mod$Stage1Mod)
   stage1_data <- .QLearningConstructCovariateMatrix(in.formula = update(analysis_args$AnalysisModeling_args$stage1.formula, 1 ~ .),
                                                     in.data = oosData, 
-                                                    create.intercept = FALSE)
+                                                    create.intercept = TRUE)
   
   stage2_data <- .QLearningConstructCovariateMatrix(in.formula = update(analysis_args$AnalysisModeling_args$stage2.formula, 1 ~ .),
                                                     in.data = oosData, 
-                                                    create.intercept = FALSE)
+                                                    create.intercept = TRUE)
   oracle_summary <- map(q_mods_list, 
                         ~map_dfr(.x = ., ~PercOracleQLearningOOS(q.mod = ., oos.data = oosData,
                                                                  stage1.data = stage1_data,

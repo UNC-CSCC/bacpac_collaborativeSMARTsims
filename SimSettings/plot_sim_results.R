@@ -1,3 +1,17 @@
+#' Temporary workaround - change the percentage of optimal to only be stage two versus baseline
+
+RenameOracleSummary <- function(oracle.summary){
+  oracle_renamed <- oracle.summary %>% 
+    rename(DifOracleYSum = DifOracle,
+           PercOraclYSum = PercOracle) %>% 
+      mutate(DifOracle = DifOracleStg2,
+             PercOracle = PercOracleStg2)
+    
+    return(oracle_renamed)
+}
+
+oracle_summary <- RenameOracleSummary(oracle_summary)
+
 all_designs <- oracle_summary %>% 
   mutate_at(., .vars = c("N", "Scenario"), 
             ~factor(., ordered = TRUE))
@@ -55,7 +69,7 @@ makePlotForScenarioV2 <- function(df){
   out <- ggplot(data = df, aes(x = Cutoff, y = Power, color = N)) + 
     # geom_hline(aes(yintercept = 0.9), color = "black") +
     # geom_vline(aes(xintercept = 0.9), color = "black") +
-    geom_line(size = 0.8) + 
+    geom_line(size = 1.2) + 
     # xlim(0, 1)+
     # ylim(0,1)+
     scale_x_continuous(breaks = seq(0.6, 1, by = .1),
@@ -66,7 +80,7 @@ makePlotForScenarioV2 <- function(df){
                        limits = c(0, 1)) +
     scale_colour_manual(values = cbp1) + 
     labs(x = "Percentage of Oracle Value Cutoff",
-         y = "Probability of Attaining Value Above Cutoff") + 
+         y = "Probability of Attaining Value Above Cutoff") +  
     theme_minimal() #+
   #theme(panel.grid.minor = element_blank())
   
@@ -105,5 +119,5 @@ plotSc1 <- makePlotForScenarioV2(filter(perc_oracle_power, Cutoff >= 0.6))
 plotDif
 plotSc1
 
-#ggsave(plot = plotSc1, filename = "PercOraclePlotFourTrtSgSc2AltRespDist_500_800.png", height = 4, width = 5.5, units = "in", device = "png")
-#ggsave(plot = plotDif, filename = "DifOraclePlotFourTrtSgSc2AltRespDist_500_800.png", height = 4, width = 5.5, units = "in", device = "png")
+#ggsave(plot = plotSc1, filename = "PercOraclePlotFourTrtSgSc1AltRespDist__600.png", height = 4, width = 5.5, units = "in", device = "png")
+#ggsave(plot = plotDif, filename = "DifOraclePlotFourTrtSgSc2AltRespDist_600.png", height = 4, width = 5.5, units = "in", device = "png")

@@ -33,13 +33,13 @@ QLearning <- function(indf,
                       impermissible.arms.df,
                       ...){
   # Error Checking -------------------------------------------------------------
-  
+  # print(unique(indf$dataSet))
   if (attr(terms((stage1.formula)), which = 'response') == 0) stop("stage1.formula must be a two-sided formula with Pseudo on the left hand side")
   if (attr(terms((stage2.formula)), which = 'response') == 0) stop("stage2.formula must be a two-sided formula with Pseudo on the left hand side")
   if (all.vars(stage1.formula)[1] != "PseudoY") stop("The left hand side of stage1.formula must be 'PseudoY'")
   if (all.vars(stage2.formula)[1] != "Y") stop("The left hand side of stage2.formula must be 'Y'")
   
-  model_options <- c("lm", "lasso", "rf")
+  model_options <- c("lm", "lasso", "rf", "twophase")
   
   # Perform some basic pre-processing of the model.type string
   model.type <- tolower(model.type) %>% trimws(.)
@@ -118,6 +118,10 @@ PredictOptSeqQLearningOOS <- function(q.mod,
               A2Opt = A2[Mu == maxMu],
               ReceivedBest = (A1Hat == A1Opt) & (A2Hat == A2Opt),
               MuAhat = Mu[which.max(Q1pred + Q2pred)],
+              Mu1Ahat = PO1[which.max(Q1pred + Q2pred)],
+              Mu2Ahat = PO2[which.max(Q1pred + Q2pred)],
+              Mu1Opt = PO1[Mu == maxMu],
+              Mu2Opt = PO2[Mu == maxMu],
               maxMu = maxMu[1],
               DeltaMuAhat = DeltaMu[which.max(Q1pred + Q2pred)],
               PercOracle = max(0, MuAhat/maxMu),
@@ -139,8 +143,14 @@ PercOracleQLearningOOS <- function(q.mod, oos.data, ...){
   perf_summary <- PredictOptSeqQLearningOOS(q.mod = q.mod, oos.data = oos.data, ...) %>% 
     summarize(MeanVal = mean(MuAhat),
               OracleVal = mean(maxMu),
+              MeanStg1Val = mean(Mu1Ahat),
+              MeanStg2Val = mean(Mu2Ahat),
               PercOracle = mean(MuAhat)/mean(maxMu),
+              PercOracleStg1 = mean(Mu1Ahat)/mean(Mu1Opt),
+              PercOracleStg2 = mean(Mu2Ahat)/mean(Mu2Opt),
               PercReceivingBestTrt = mean(ReceivedBest),
+              DifOracleStg1 = mean(Mu1Opt) - MeanStg1Val,
+              DifOracleStg2 = mean(Mu2Opt) - MeanStg2Val,
               DifOracle = OracleVal - MeanVal)
   
   return(perf_summary)
@@ -286,6 +296,9 @@ PercOracleQLearningOOS <- function(q.mod, oos.data, ...){
   
   glmnet_fit <- glmnet::cv.glmnet(x = data.list$x,
                            y = data.list$y,
+                           alpha = 1,
+                           nfolds = 10,
+                           intercept = FALSE,
                            ...)
   
   return(glmnet_fit)
@@ -328,7 +341,8 @@ PercOracleQLearningOOS <- function(q.mod, oos.data, ...){
                                    ...){
   
   model.comp <- glmnetUtils:::makeModelComponents(formula = in.formula,
-                                                  data = in.data)
+                                                  data = in.data, 
+                                                  na.action = "na.pass")
   
   x_mat <- model.comp$x[, !colnames(model.comp$x) %in% names.to.remove]
   
