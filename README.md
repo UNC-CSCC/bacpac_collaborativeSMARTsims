@@ -1,7 +1,4 @@
-# bacpac_collaborativeSMARTsims
+# Simulation Files for the Biomarkers for Evaluating Spine Treatments (BEST) Trial
 
-# Docker File Instructions
-
-you'll need to get the microsoft.asc file and put in in the Code
-directory (with the Dockerfile) to build the container.
+For a very rough overview of how the simulation is structured check out the Code_Overview presentation file.
 
