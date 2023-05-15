@@ -1,7 +1,0 @@
-Parameter,Coefficient
-(Intercept), -0.1
-A2_0,0.1
-A2_1,0.3
-A2_2,0.4
-A2_1:W_2, 0.3
-A2_1:A2_2, -0.15

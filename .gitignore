@@ -11,9 +11,11 @@
 # Personal notes and WIP directories
 Notes
 Zzz
+WIP
 Code/WIP
 Code/zzz
 SimRuns
+SimResultPlots
 SC_Simulations/ParameterCSVs/Zzz
 
 # OAuth2 token, see https://github.com/hadley/httr/releases/tag/v0.3
