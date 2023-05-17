@@ -70,19 +70,21 @@ covariateFn_Mvn <- function(df, numBinaryCovars, props,
 #'
 #' @return dataframe with the generated binary covariates appended
 makeBinaryCovars <- function(df, numCovars, props){
-  if(numCovars < 0){
-    warning("Number of binary covariates must be non-negative")
-  } else if(numCovars == 0){
-    return(df)
-  } else{
-    covarNames <- paste("X", 1:numCovars, sep = "_")
-    for(i in 1:numCovars){
-      df <- df %>% rowwise() %>%
-        mutate(!!sym(covarNames[i]) := 2*rbinom(n = 1, size = 1, prob = props[i])-1) %>%
-        ungroup()
-    }
-    return(df)
+  stopifnot("Number of normal covariates must be non-negative" = numCovars >= 0)
+  stopifnot("Length of props must match numCovars the number of covariates" = numCovars == length(props))
+  
+  if(numCovars == 0){  return(df)  }
+  
+  
+  covarNames <- paste("X", 1:numCovars, sep = "_")
+  for(i in 1:numCovars){
+    df <- df %>% rowwise() %>%
+      mutate(!!sym(covarNames[i]) := 2*rbinom(n = 1, size = 1, prob = props[i])-1) %>%
+      ungroup()
   }
+  
+  return(df)
+  
 }
 
 #' Add binary covariates to the generated patients that takes value in {0, 1}
@@ -95,19 +97,21 @@ makeBinaryCovars <- function(df, numCovars, props){
 #'
 #' @return dataframe with the generated binary covariates appended
 makeBinaryCovarsZeroOne <- function(df, numCovars, props){
-  if(numCovars < 0){
-    warning("Number of binary covariates must be non-negative")
-  } else if(numCovars == 0){
-    return(df)
-  } else{
-    covarNames <- paste("X", 1:numCovars, sep = "_")
-    for(i in 1:numCovars){
-      df <- df %>% rowwise() %>%
-        mutate(!!sym(covarNames[i]) := rbinom(n = 1, size = 1, prob = props[i])) %>%
-        ungroup()
-    }
-    return(df)
+  stopifnot("Number of normal covariates must be non-negative" = numCovars >= 0)
+  stopifnot("Length of props must match numCovars the number of covariates" = numCovars == length(props))
+
+  if(numCovars == 0){  return(df)  }
+
+  covarNames <- paste("X", 1:numCovars, sep = "_")
+  
+  for(i in 1:numCovars){
+    df <- df %>% rowwise() %>%
+      mutate(!!sym(covarNames[i]) := rbinom(n = 1, size = 1, prob = props[i])) %>%
+      ungroup()
   }
+  
+  return(df)
+
 }
 
 
@@ -121,19 +125,21 @@ makeBinaryCovarsZeroOne <- function(df, numCovars, props){
 #'
 #' @return dataframe; df with the normal covariates appended
 makeNormalCovariates <- function(df, numCovars, mu, sd){
-  if(numCovars < 0){
-    warning("Number of normal covariates must be non-negative")
-  } else if(numCovars == 0){
-    return(df)
-  } else{
-    covarNames <- paste("W", 1:numCovars, sep = "_")
-    for(i in 1:numCovars){
-      df <- df %>% rowwise() %>%
-        mutate(!!sym(covarNames[i]) := rnorm(n = 1, mean = mu[i], sd = sd[i])) %>%
-        ungroup()
-    }
-    return(df)
+  
+  stopifnot("Number of normal covariates must be non-negative" = numCovars >= 0)
+  stopifnot("Length of mu must match numCovars the number of covariates" = numCovars == length(mu))
+  stopifnot("Length of mu must match numCovars the number of covariates" = numCovars == length(sd))
+  
+ if(numCovars == 0)    return(df)   
+    
+  covarNames <- paste("W", 1:numCovars, sep = "_")
+  for(i in 1:numCovars){
+    df <- df %>% rowwise() %>%
+       mutate(!!sym(covarNames[i]) := rnorm(n = 1, mean = mu[i], sd = sd[i])) %>%
+      ungroup()
   }
+  return(df)
+  
 }
 
 

@@ -121,16 +121,18 @@ allocationFn_stage2_trt_grid_4resps <- function(df, trt.options.grid, lowest_aug
     summarise(PossibleByA1 = list(unique(A2)),
               .groups = 'drop')
   
+  max_single_trt_id <- lowest_augmentation_trt_number - 1
+  
   # Expand the set of possibilities by response status, then apply the logic based on 
   # response status to define the feasible set for A2
   stage2_feasible_by_A1_resp_status <- stage2_feasible_trts_by_A1 %>% 
     expand_grid(respStatus = c("bad", "medium", "good", "excellent"), .) %>% 
     rowwise(.) %>% 
     mutate(FeasibleSet = case_when(respStatus == "excellent" ~ list(A1),
-                                   respStatus == "good" ~ list(setdiff(PossibleByA1, 0:(lowest_augmentation_trt_number-1))),
+                                   respStatus == "good" ~ list(setdiff(PossibleByA1, 0:max_single_trt_id)),
                                    respStatus == "bad" ~ if_else(A1 == "0",
                                                                  list(setdiff(PossibleByA1, A1)),
-                                                                 list(setdiff(as.character(1:(lowest_augmentation_trt_number-1)), A1))),
+                                                                 list(setdiff(as.character(1:max_single_trt_id), A1))),
                                    respStatus == "medium" ~ list(setdiff(PossibleByA1, A1)),
                                    TRUE ~ list("I Should be unreachable, investigate if you see me"))) %>% 
     select(-PossibleByA1)
