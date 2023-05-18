@@ -106,7 +106,7 @@ names(stage2_param_vec) <- stage2_param_df$Parameter
 stage1_args <- list( stage.suffix = 1,
                      treatment.arm.df = read_csv("./DesignMatrices/FourArm/stage1_design_matrix.csv", col_types = "ciiii"),
                      arm.var.name = "A1",
-                     true.model.formula = formula(~ -1 + X_2 + X_3 +A1_0 + A1_1 + A1_2 + A1_3 + X_2 + X_3 + A1_3:X_1 + A1_2:X_1), 
+                     true.model.formula = formula(~ -1 + X_2 + X_3 +A1_0 + A1_1 + A1_2 + A1_3 + X_2 + X_3 + A1_3:X_1), 
                      true.param.vec = stage1_param_vec,
                      sigma.noise = 1,
                      include.trt.indicators = TRUE,
@@ -115,7 +115,10 @@ stage1_args <- list( stage.suffix = 1,
 stage2_args <- list(stage.suffix = 2,
                     treatment.arm.df = read_csv("./DesignMatrices/FourArm/stage2_design_matrix.csv", col_types = "ciiii"),
                     arm.var.name = "A2",
-                    true.model.formula = formula(~ -1 + X_2 + X_3 + A2_0 + A2_1 + A2_2 + A2_3 + X_2 + X_3 + A2_1:A2_2 + A2_1:A2_3 + A2_2:A2_3 + A2_2:X_1 + A2_3:X_1 + A2_0:A2_1 + A2_0:A2_2 + A2_0:A2_3), 
+                    true.model.formula = formula(~ -1 + X_2 + X_3 + A2_0 + A2_1 + A2_2 + A2_3 + X_2 + X_3 + 
+                                                   A2_1:A2_2 + A2_1:A2_3 + A2_2:A2_3 + 
+                                                   A2_3:X_1 + 
+                                                   A2_0:A2_1 + A2_0:A2_2 + A2_0:A2_3), 
                     true.param.vec = stage2_param_vec,
                     sigma.noise = 1,
                     include.trt.indicators = TRUE,
@@ -149,7 +152,7 @@ args <- list(
 ## Settings: Scenario Modifications
 ##------------------------------------------------------------------------------
 
-n_settings <- c(630)
+n_settings <- c(350, 450, 630)
 
 metadata_settings_scenario1 <- map(n_settings, ~list_modify(metadata, N = .))
 
@@ -283,7 +286,7 @@ if (run_analysis_flag == TRUE) {
                                                     create.intercept = TRUE)
   
   stage2_data <- .QLearningConstructCovariateMatrix(in.formula = update(analysis_args$AnalysisModeling_args$stage2.formula, 1 ~ .),
-                                                    in.data = oosData, 
+                                                    in.data = oosData,
                                                     create.intercept = TRUE)
   oracle_summary <- map(q_mods_list, 
                         ~map_dfr(.x = ., ~PercOracleQLearningOOS(q.mod = ., oos.data = oosData,
@@ -293,28 +296,83 @@ if (run_analysis_flag == TRUE) {
     left_join(., y = tibble(Scenario = as.character(1:length(n_settings)), N = n_settings), by = "Scenario")
   
   
-  toc()
+  toc()                    
   
-  
-  
-  print("Hypothesis testing")
-  
-  
-  tic()
-  stage1_power_results_sc1 <- map(sim_data_list[1:length(metadata_settings_scenario1)],
-                                  ~map_dfr(.x = ., ~CalcStage1WaldUnadjustedPvals(study.data = .,
-                                                                                  resp.formula = formula(Y1 ~ A1),
-                                                                                  coefs.to.test = c("A11", "A12", "A13")))) %>% 
-    map(., ~AdjustPvals(., adj.method = "BH"))
-  
-  stage1_pval_summary <- map_dfr(stage1_power_results_sc1, ~colMeans(. < .05))
-  
-  toc()
   
   analysis_results <- list(oracle_summary, stage1_power_results_sc1)
   
   
 } 
+
+if(run_hypothesis_tests_flag == TRUE){
+  print("Hypothesis testing")
+  
+  
+  tic()
+  stage1_power_v_esc_wald <- map(sim_data_list[1:length(metadata_settings_scenario1)],
+                                  ~map_dfr(.x = ., ~CalcWaldUnadjustedPvals(study.data = .,
+                                                                                   resp.formula = formula(Y1 ~ A1),
+                                                                                   coefs.to.test = c("A11", "A12", "A13")))) %>% 
+    map(., ~AdjustPvals(., adj.method = "BH"))
+  
+  stage1_power_v_esc_unadj <- map(sim_data_list[1:length(metadata_settings_scenario1)],
+                                 ~map_dfr(.x = ., ~CalcWaldUnadjustedPvals(study.data = .,
+                                                                           resp.formula = formula(Y1 ~ A1),
+                                                                           coefs.to.test = c("A11", "A12", "A13")))) 
+  
+  stage1_power_vs_zero_wald <- map(sim_data_list[1:length(metadata_settings_scenario1)],
+                                  ~map_dfr(.x = ., ~CalcWaldUnadjustedPvals(study.data = .,
+                                                                                      resp.formula = formula(Y1 ~ A1 - 1),
+                                                                                      coefs.to.test = c("A10", "A11", "A12", "A13")))) %>% 
+    map(., ~AdjustPvals(., adj.method = "BH"))
+  
+  overall_power_v_esc_wald <- map(sim_data_list[1:length(metadata_settings_scenario1)],
+                                 ~map_dfr(.x = ., ~CalcWaldUnadjustedPvals(study.data = .,
+                                                                                     resp.formula = formula(Y ~ A1),
+                                                                                     coefs.to.test = c("A11", "A12", "A13")))) %>% 
+    map(., ~AdjustPvals(., adj.method = "BH"))
+  
+  overall_power_vs_zero_wald <- map(sim_data_list[1:length(metadata_settings_scenario1)],
+                                   ~map_dfr(.x = ., ~CalcWaldUnadjustedPvals(study.data = .,
+                                                                                       resp.formula = formula(Y ~ A1 - 1),
+                                                                                       coefs.to.test = c("A10", "A11", "A12", "A13")))) %>% 
+    map(., ~AdjustPvals(., adj.method = "BH"))
+  
+  stage1_hsd <- map(sim_data_list[1:length(metadata_settings_scenario1)],
+                    ~map_dfr(.x = ., ~CalcTukeyHSDPvals(study.data = .,
+                                                                        resp.formula = formula(Y1 ~ A1))))
+  
+  stage1_overall_hsd <- map(sim_data_list[1:length(metadata_settings_scenario1)],
+                    ~map_dfr(.x = ., ~CalcTukeyHSDPvals(study.data = .,
+                                                        resp.formula = formula(Y ~ A1))))
+  
+  augment_v_switch_overall <- map(sim_data_list[1:length(metadata_settings_scenario1)],
+                            ~map_dbl(.x = ., ~TestAugmentVsSwitch(study.data = ., conditional = FALSE))) 
+  
+  augment_v_switch_conditional <- map(sim_data_list[1:length(metadata_settings_scenario1)],
+                                  ~map_dfr(.x = ., ~TestAugmentVsSwitch(study.data = ., conditional = TRUE))) %>% 
+    map(., ~AdjustPvals(., adj.method = "BH"))
+  
+  stage1_v_esc_pval_summary <- map_dfr(stage1_power_v_esc_wald, ~colMeans(. < .05))
+  
+  stage1_v_esc_unadj_pval_summary <- map_dfr(stage1_power_v_esc_unadj, ~colMeans(. < .05))
+  
+  
+  stage1_v_zero_pval_summary <- map_dfr(stage1_power_vs_zero_wald, ~colMeans(. < .05))
+  
+  overall_v_esc_pval_summary <- map_dfr(overall_power_v_esc_wald, ~colMeans(. < .05))
+  overall_v_zero_pval_summary <- map_dfr(overall_power_vs_zero_wald, ~colMeans(. < .05))
+  
+  stage1_hsd_pval_summary <- map_dfr(stage1_hsd, ~colMeans(. < .05))
+  stage1_overall_hsd_pval_summary <- map_dfr(stage1_overall_hsd, ~colMeans(. < .05))
+  
+  augment_conditional_pval_summary <- map_dfr(augment_v_switch_conditional, ~colMeans(. < .05))
+  
+  any_sig_dif_hsd <- mean(rowSums(stage1_hsd[[1]] < .05) >= 1)
+  any_sig_dif_hsd_overall <- mean(rowSums(stage1_overall_hsd[[1]] < .05) >= 1)
+  
+  toc()
+}
 
 if (is_null(read_analysis_file_string) == FALSE) analysis_results <- readRDS(read_analysis_file_string)
 

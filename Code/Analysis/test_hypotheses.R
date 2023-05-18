@@ -7,8 +7,8 @@
 ################################################################################
 
 #' 
-#' This function uses \code{lm} with ESC as a reference level, and then uses univariate
-#' Wald tests of the treatment coefficients to calculate unadjusted p-values.
+#' This function uses \code{lm} and 
+#' Wald tests to calculate unadjusted p-values.
 #' 
 #' @param study.data data frame containing the study data
 #' @param resp.formula formula object with the linear model to the data
@@ -19,7 +19,7 @@
 #' 
 #' @return vector of p-values with length = nrow(contrast.mat) of unadjusted Wald p-values
 #' 
-CalcWaldUnivateVsESCUnadjusted <- function(study.data,
+CalcWaldUnadjustedPvals <- function(study.data,
                                           resp.formula,
                                           contrast.mat = NULL,
                                           coefs.to.test = NULL){
@@ -72,11 +72,12 @@ CalcWaldUnivateVsESCUnadjusted <- function(study.data,
 
 CalcTukeyHSDPvals <- function(study.data,
                          resp.formula,
-                         which.terms,
+                         #which.terms,
                          ...){
   
-  model_terms <- attr(resp.formula, "term.labels")
-  n_model_terms <- n_model_terms
+  model_terms <- attr(terms(resp.formula), "term.labels")
+
+  n_model_terms <- length(model_terms)
   stopifnot("Designed to only handle a single model term" = n_model_terms == 1)
   
   # Including second-line treatments gets into some weirdness because A2 depends on Y1 and A1
@@ -93,6 +94,38 @@ CalcTukeyHSDPvals <- function(study.data,
   
 }
 
+
+#' Define Augment and Switch indicators
+#' Use the Wald test to test for equality of the two
+TestAugmentVsSwitch <- function(study.data, conditional = FALSE){
+  study.data <- study.data %>% 
+    mutate(Augment = (A2_0 + A2_1 + A2_2 + A2_3) > 1,
+           Switch = (A2 != A1) & Augment == FALSE)
+  
+  if(conditional == FALSE){
+    augment_vs_switch_pvals <- CalcWaldUnadjustedPvals(study.data = study.data %>% filter(A1 != 0),
+                                                      resp.formula = formula(Y2 ~ Augment + Switch),
+                                                      contrast.mat = matrix(c(0, 1, -1), nrow = 1))
+  }
+  if(conditional == TRUE){
+    switchable_stg1_trts <- 1:3
+    augment_vs_switch_pvals <- vector(length = length(switchable_stg1_trts))
+    
+    for(i in 1:length(switchable_stg1_trts)){
+      augment_vs_switch_pvals[i] <- CalcWaldUnadjustedPvals(study.data = study.data %>% filter(A1 == switchable_stg1_trts[i]),
+                                                            resp.formula = formula(Y2 ~ Augment + Switch),
+                                                            contrast.mat = matrix(c(0, 1, -1), nrow = 1))
+    }
+    names(augment_vs_switch_pvals) <- paste0("A1_", 1:3)
+  }
+  
+  return(augment_vs_switch_pvals)
+}
+
+TestBestNonresponse <- function(study.data, nonresp.cats = c("bad", "medium")){
+  nonresp_data <- study.data %>% filter(respStatus %in% nonresp.cats, A2 %in% 0:3) %>% 
+    select(A1, A2, Y2)
+}
 ################################################################################
 ### Adjust P-values
 #
